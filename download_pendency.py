@@ -8,12 +8,6 @@ If a step fails, open the run in the Actions tab, download the
 "playwright-trace" artifact, then drag the trace.zip file into
 https://trace.playwright.dev — it replays the whole run visually,
 click by click, so we can see exactly where and why it stopped.
-
-NOTE: the exact selectors below (button text, link text) are my best
-guess based on how the portal was described to me, not something I
-could see or test directly. The first run or two will likely need a
-small fix once we can actually see where it stops — that's expected,
-not a sign the overall approach is wrong.
 """
 
 import os
@@ -22,6 +16,8 @@ import sys
 from playwright.sync_api import sync_playwright
 
 LOGIN_URL = "https://ecom.shadowfax.in/#/login"
+FWD_URL = "https://ecomnew.shadowfax.in/floor-pendency-tracking"
+REV_URL = "https://ecomnew.shadowfax.in/floor-pendency-tracking-rev"
 USERNAME = os.environ.get("SHADOWFAX_USERNAME")
 PASSWORD = os.environ.get("SHADOWFAX_PASSWORD")
 SCREENSHOT_DIR = "debug_screenshots"
@@ -47,8 +43,7 @@ def login(page):
     page.goto(LOGIN_URL, wait_until="networkidle")
     snap(page, "login_page")
 
-    # Confirmed via DevTools inspection -- exact element IDs, the most
-    # reliable selector available.
+    # Confirmed via DevTools inspection -- exact element IDs.
     page.locator("#input_ecom_username").fill(USERNAME)
     page.locator("#input_ecom_password").fill(PASSWORD)
     snap(page, "login_filled")
@@ -58,27 +53,22 @@ def login(page):
     snap(page, "after_login")
 
 
-def go_to_pendency_report(page):
-    print("Navigating: DC Live Dashboards > Fwd/Rev Floor > Pendency & Tracking...")
-    page.get_by_text("DC Live Dashboards").click()
-    snap(page, "clicked_dc_live_dashboards")
+def download_report(page, report_url, save_as):
+    print(f"Going to {report_url} ...")
+    page.goto(report_url, wait_until="networkidle")
+    snap(page, f"{save_as}_page_loaded")
 
-    page.get_by_text("Fwd/Rev Floor").click()
-    snap(page, "clicked_fwd_rev_floor")
+    print("  clicking Apply & Download...")
+    page.get_by_role("button", name="Apply & Download").click()
+    snap(page, f"{save_as}_after_apply")
 
-    page.get_by_text("Pendency & Tracking").click()
-    page.wait_for_load_state("networkidle")
-    snap(page, "pendency_tracking_page")
-
-
-def download_report(page, save_as):
-    print(f"Clicking Download, saving as {save_as}...")
+    print("  clicking Download...")
     with page.expect_download(timeout=60000) as download_info:
         page.get_by_role("button", name="Download").click()
     download = download_info.value
     download.save_as(save_as)
     print(f"  saved -> {save_as}")
-    snap(page, f"downloaded_{save_as}")
+    snap(page, f"{save_as}_downloaded")
 
 
 def main():
@@ -89,15 +79,8 @@ def main():
         page = context.new_page()
         try:
             login(page)
-            go_to_pendency_report(page)
-            download_report(page, "fwd_pendency.csv")
-
-            print("Switching to REV...")
-            page.get_by_text("REV", exact=True).click()
-            page.wait_for_load_state("networkidle")
-            snap(page, "switched_to_rev")
-            download_report(page, "rev_pendency.csv")
-
+            download_report(page, FWD_URL, "fwd_pendency.csv")
+            download_report(page, REV_URL, "rev_pendency.csv")
             print("\nBoth files downloaded successfully.")
         except Exception as e:
             snap(page, "failure")
