@@ -47,11 +47,13 @@ def login(page):
     page.goto(LOGIN_URL, wait_until="networkidle")
     snap(page, "login_page")
 
-    page.get_by_placeholder("Username").fill(USERNAME)
-    page.get_by_placeholder("Password").fill(PASSWORD)
+    # Confirmed via DevTools inspection -- exact element IDs, the most
+    # reliable selector available.
+    page.locator("#input_ecom_username").fill(USERNAME)
+    page.locator("#input_ecom_password").fill(PASSWORD)
     snap(page, "login_filled")
 
-    page.get_by_role("button", name="Login").click()
+    page.locator("#btn_ecom_signin").click()
     page.wait_for_load_state("networkidle")
     snap(page, "after_login")
 
