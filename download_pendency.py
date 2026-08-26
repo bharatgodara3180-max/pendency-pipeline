@@ -1,6 +1,6 @@
 """
-Logs into the Shadowfax ops portal and downloads the FWD and REV floor
-pendency reports as fwd_pendency.csv / rev_pendency.csv.
+Downloads the FWD and REV floor pendency reports from the Shadowfax ops
+portal as fwd_pendency.csv / rev_pendency.csv.
 
 Built to run inside GitHub Actions, not on a laptop. Every step takes a
 screenshot, and a full Playwright trace is recorded the whole way through.
@@ -15,7 +15,6 @@ import sys
 
 from playwright.sync_api import sync_playwright
 
-LOGIN_URL = "https://ecom.shadowfax.in/#/login"
 FWD_URL = "https://ecomnew.shadowfax.in/floor-pendency-tracking"
 REV_URL = "https://ecomnew.shadowfax.in/floor-pendency-tracking-rev"
 USERNAME = os.environ.get("SHADOWFAX_USERNAME")
@@ -38,40 +37,7 @@ def snap(page, label):
     print(f"  [screenshot] {path}  (on page: {page.url})")
 
 
-def login(page):
-    print("Opening login page...")
-    page.goto(LOGIN_URL, wait_until="networkidle")
-    snap(page, "login_page")
-
-    # Confirmed via DevTools inspection -- exact element IDs.
-    page.locator("#input_ecom_username").fill(USERNAME)
-    page.locator("#input_ecom_password").fill(PASSWORD)
-    snap(page, "login_filled")
-
-    page.locator("#btn_ecom_signin").click()
-    page.wait_for_load_state("networkidle")
-    snap(page, "after_login")
-
-
-def download_report(page, report_url, save_as):
-    print(f"Going to {report_url} ...")
-    page.goto(report_url, wait_until="networkidle")
-    snap(page, f"{save_as}_page_loaded")
-
-    extra_login = page.get_by_role("button", name="Login", exact=True)
-    if extra_login.is_visible():
-        print("  extra login screen appeared -- logging in again...")
-        extra_login.click()
-        page.wait_for_load_state("networkidle")
-        snap(page, f"{save_as}_after_extra_login_click")
-
-        page.locator("#input_ecom_username").fill(USERNAME)
-        page.locator("#input_ecom_password").fill(PASSWORD)
-        snap(page, f"{save_as}_relogin_filled")
-        page.locator("#btn_ecom_signin").click()
-        page.wait_for_load_state("networkidle")
-        snap(page, f"{save_as}_relogin_done")
-
+def download_report(page, save_as):
     print("  opening download panel...")
     page.locator("button.dwnld-btn").click()
     snap(page, f"{save_as}_panel_opened")
@@ -96,9 +62,42 @@ def main():
         context.tracing.start(screenshots=True, snapshots=True, sources=True)
         page = context.new_page()
         try:
-            login(page)
-            download_report(page, FWD_URL, "fwd_pendency.csv")
-            download_report(page, REV_URL, "rev_pendency.csv")
+            # Step 1: go straight to the FWD report.
+            print(f"Going to {FWD_URL} ...")
+            page.goto(FWD_URL, wait_until="networkidle")
+            snap(page, "fwd_first_visit")
+
+            login_button = page.get_by_role("button", name="Login", exact=True)
+            if login_button.is_visible():
+                print("  'Please login' screen shown -- logging in...")
+                login_button.click()
+                page.wait_for_load_state("networkidle")
+                snap(page, "clicked_login_button")
+
+                # Step 2: fill the login form and sign in.
+                page.locator("#input_ecom_username").fill(USERNAME)
+                page.locator("#input_ecom_password").fill(PASSWORD)
+                snap(page, "login_filled")
+                page.locator("#btn_ecom_signin").click()
+                page.wait_for_load_state("networkidle")
+                snap(page, "after_login")
+
+                # Go back to the FWD report now that we're logged in.
+                print(f"Going to {FWD_URL} again after login...")
+                page.goto(FWD_URL, wait_until="networkidle")
+                snap(page, "fwd_after_login_revisit")
+            else:
+                print("  went straight to the report, no login screen needed")
+
+            # Step 3: download FWD.
+            download_report(page, "fwd_pendency.csv")
+
+            # Step 4: go to REV and repeat step 3.
+            print(f"Going to {REV_URL} ...")
+            page.goto(REV_URL, wait_until="networkidle")
+            snap(page, "rev_page_loaded")
+            download_report(page, "rev_pendency.csv")
+
             print("\nBoth files downloaded successfully.")
         except Exception as e:
             snap(page, "failure")
