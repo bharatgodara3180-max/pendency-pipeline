@@ -67,7 +67,7 @@ def main():
             page.goto(FWD_URL, wait_until="networkidle")
             snap(page, "fwd_first_visit")
 
-            login_button = page.get_by_role("button", name="Login", exact=True)
+            login_button = page.locator("button:has-text('Login')")
             if login_button.is_visible():
                 print("  'Please login' screen shown -- logging in...")
                 login_button.click()
