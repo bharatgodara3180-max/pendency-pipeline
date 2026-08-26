@@ -13,7 +13,7 @@ click by click, so we can see exactly where and why it stopped.
 import os
 import sys
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 FWD_URL = "https://ecomnew.shadowfax.in/floor-pendency-tracking"
 REV_URL = "https://ecomnew.shadowfax.in/floor-pendency-tracking-rev"
@@ -68,9 +68,10 @@ def main():
             snap(page, "fwd_first_visit")
 
             login_button = page.locator("button:has-text('Login')")
-            if login_button.is_visible():
+            try:
+                login_button.wait_for(state="visible", timeout=8000)
                 print("  'Please login' screen shown -- logging in...")
-                login_button.click()
+                login_button.click(force=True)
                 page.wait_for_load_state("networkidle")
                 snap(page, "clicked_login_button")
 
@@ -86,7 +87,7 @@ def main():
                 print(f"Going to {FWD_URL} again after login...")
                 page.goto(FWD_URL, wait_until="networkidle")
                 snap(page, "fwd_after_login_revisit")
-            else:
+            except PlaywrightTimeoutError:
                 print("  went straight to the report, no login screen needed")
 
             # Step 3: download FWD.
