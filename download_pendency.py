@@ -35,7 +35,7 @@ def snap(page, label):
     _step_count += 1
     path = os.path.join(SCREENSHOT_DIR, f"{_step_count:02d}_{label}.png")
     page.screenshot(path=path, full_page=True)
-    print(f"  [screenshot] {path}")
+    print(f"  [screenshot] {path}  (on page: {page.url})")
 
 
 def login(page):
@@ -82,9 +82,10 @@ def main():
             download_report(page, FWD_URL, "fwd_pendency.csv")
             download_report(page, REV_URL, "rev_pendency.csv")
             print("\nBoth files downloaded successfully.")
-        except Exception as e:
+                except Exception as e:
             snap(page, "failure")
-            print(f"\nStopped early: {e}")
+            print(f"\nStopped early on page: {page.url}")
+            print(f"Error: {e}")
             raise
         finally:
             context.tracing.stop(path="trace.zip")
