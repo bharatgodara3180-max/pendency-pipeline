@@ -58,6 +58,20 @@ def download_report(page, report_url, save_as):
     page.goto(report_url, wait_until="networkidle")
     snap(page, f"{save_as}_page_loaded")
 
+    extra_login = page.get_by_role("button", name="Login", exact=True)
+    if extra_login.is_visible():
+        print("  extra login screen appeared -- logging in again...")
+        extra_login.click()
+        page.wait_for_load_state("networkidle")
+        snap(page, f"{save_as}_after_extra_login_click")
+
+        page.locator("#input_ecom_username").fill(USERNAME)
+        page.locator("#input_ecom_password").fill(PASSWORD)
+        snap(page, f"{save_as}_relogin_filled")
+        page.locator("#btn_ecom_signin").click()
+        page.wait_for_load_state("networkidle")
+        snap(page, f"{save_as}_relogin_done")
+
     print("  opening download panel...")
     page.locator("button.dwnld-btn").click()
     snap(page, f"{save_as}_panel_opened")
