@@ -58,6 +58,10 @@ def download_report(page, report_url, save_as):
     page.goto(report_url, wait_until="networkidle")
     snap(page, f"{save_as}_page_loaded")
 
+    print("  opening download panel...")
+    page.locator("button.dwnld-btn").click()
+    snap(page, f"{save_as}_panel_opened")
+
     print("  clicking Apply & Download...")
     page.get_by_role("button", name="Apply & Download").click()
     snap(page, f"{save_as}_after_apply")
