@@ -125,7 +125,19 @@ def main():
                 page.locator("#input_ecom_password").fill(PASSWORD)
                 snap(page, "login_filled")
                 page.locator("#btn_ecom_signin").click()
-                page.wait_for_load_state("networkidle")
+
+                # Don't rely on networkidle here -- this app finishes logging in
+                # after the network goes quiet. Wait until the username box is
+                # actually gone, which only happens once login really completed.
+                print("  waiting for login to finish...")
+                try:
+                    page.locator("#input_ecom_username").wait_for(
+                        state="hidden", timeout=60000
+                    )
+                    print("  login completed")
+                except Exception:
+                    print("  username box still visible -- login may have failed")
+                page.wait_for_timeout(5000)
                 snap(page, "after_login")
 
                 # Go back to the FWD report now that we're logged in.
