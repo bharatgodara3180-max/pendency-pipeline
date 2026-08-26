@@ -82,7 +82,7 @@ def main():
             download_report(page, FWD_URL, "fwd_pendency.csv")
             download_report(page, REV_URL, "rev_pendency.csv")
             print("\nBoth files downloaded successfully.")
-                except Exception as e:
+        except Exception as e:
             snap(page, "failure")
             print(f"\nStopped early on page: {page.url}")
             print(f"Error: {e}")
