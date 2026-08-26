@@ -6,14 +6,13 @@ Built to run inside GitHub Actions, not on a laptop. Every step takes a
 screenshot, and a full Playwright trace is recorded the whole way through.
 If a step fails, open the run in the Actions tab, download the
 "playwright-trace" artifact, then drag the trace.zip file into
-https://trace.playwright.dev — it replays the whole run visually,
-click by click, so we can see exactly where and why it stopped.
+https://trace.playwright.dev — it replays the whole run visually.
 """
 
 import os
 import sys
 
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import sync_playwright
 
 FWD_URL = "https://ecomnew.shadowfax.in/floor-pendency-tracking"
 REV_URL = "https://ecomnew.shadowfax.in/floor-pendency-tracking-rev"
@@ -35,6 +34,48 @@ def snap(page, label):
     path = os.path.join(SCREENSHOT_DIR, f"{_step_count:02d}_{label}.png")
     page.screenshot(path=path, full_page=True)
     print(f"  [screenshot] {path}  (on page: {page.url})")
+
+
+def dump_clickables(page, label):
+    """Print every button/link/input on the page so we can see what's actually there."""
+    print(f"\n----- clickable elements on page [{label}] -----")
+    try:
+        items = page.evaluate("""
+            () => Array.from(
+                document.querySelectorAll('button, a, input, [role=button], mat-icon')
+            ).slice(0, 40).map(el => ({
+                tag: el.tagName,
+                id: el.id || '',
+                cls: (el.className && el.className.baseVal !== undefined
+                      ? el.className.baseVal : el.className) || '',
+                text: (el.innerText || el.value || '').trim().slice(0, 40)
+            }))
+        """)
+        for it in items:
+            print(f"  <{it['tag']}> id='{it['id']}' class='{it['cls']}' text='{it['text']}'")
+    except Exception as err:
+        print(f"  (could not read elements: {err})")
+    print("----- end -----\n")
+
+
+def click_login(page):
+    """Try several ways to click the Login button; return True if one worked."""
+    attempts = [
+        ("button:has-text('Login')", "button with Login text"),
+        ("a:has-text('Login')", "link styled as button"),
+        ("[role=button]:has-text('Login')", "role=button"),
+        ("text=Login", "any element with Login text"),
+    ]
+    for selector, description in attempts:
+        loc = page.locator(selector).first
+        try:
+            if loc.count() > 0:
+                print(f"  found login via: {description}  ({selector})")
+                loc.click(force=True, timeout=10000)
+                return True
+        except Exception as err:
+            print(f"  tried {description} -- didn't work: {type(err).__name__}")
+    return False
 
 
 def download_report(page, save_as):
@@ -66,14 +107,18 @@ def main():
             print(f"Going to {FWD_URL} ...")
             page.goto(FWD_URL, wait_until="networkidle")
             snap(page, "fwd_first_visit")
+            dump_clickables(page, "first visit")
 
-            login_button = page.locator("button:has-text('Login')")
-            try:
-                login_button.wait_for(state="visible", timeout=8000)
-                print("  'Please login' screen shown -- logging in...")
-                login_button.click(force=True)
+            if "Please login" in page.content():
+                print("  'Please login' screen is showing -- clicking Login...")
+                if not click_login(page):
+                    raise RuntimeError(
+                        "Could not click the Login button with any selector. "
+                        "See the element dump above for what's actually on the page."
+                    )
                 page.wait_for_load_state("networkidle")
                 snap(page, "clicked_login_button")
+                dump_clickables(page, "after clicking login")
 
                 # Step 2: fill the login form and sign in.
                 page.locator("#input_ecom_username").fill(USERNAME)
@@ -87,7 +132,8 @@ def main():
                 print(f"Going to {FWD_URL} again after login...")
                 page.goto(FWD_URL, wait_until="networkidle")
                 snap(page, "fwd_after_login_revisit")
-            except PlaywrightTimeoutError:
+                dump_clickables(page, "fwd report page")
+            else:
                 print("  went straight to the report, no login screen needed")
 
             # Step 3: download FWD.
@@ -102,6 +148,7 @@ def main():
             print("\nBoth files downloaded successfully.")
         except Exception as e:
             snap(page, "failure")
+            dump_clickables(page, "at failure")
             print(f"\nStopped early on page: {page.url}")
             print(f"Error: {e}")
             raise
