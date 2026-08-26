@@ -87,9 +87,31 @@ def download_report(page, save_as):
     page.get_by_role("button", name="Apply & Download").click()
     snap(page, f"{save_as}_after_apply")
 
+    # The file is generated on the server, so it isn't ready instantly.
+    # Poll for up to ~2 minutes, hitting Refresh each time, until the
+    # popup's Download button appears.
+    print("  waiting for the file to be generated...")
+    for attempt in range(20):
+        page.wait_for_timeout(6000)
+        if page.locator("button.download-btn").count() > 0:
+            print(f"  file ready after ~{(attempt + 1) * 6}s")
+            break
+        refresh = page.locator("button.download-chk-btn")
+        if refresh.count() > 0:
+            try:
+                refresh.first.click()
+            except Exception:
+                pass
+    else:
+        snap(page, f"{save_as}_never_ready")
+        raise RuntimeError("File never became ready to download.")
+
+    # Use the exact class here, NOT the name "Download" -- the icon button
+    # that opens this panel also has the text "download" (Material icon
+    # ligature), so matching by name can hit the wrong element.
     print("  clicking Download...")
-    with page.expect_download(timeout=60000) as download_info:
-        page.get_by_role("button", name="Download").click()
+    with page.expect_download(timeout=120000) as download_info:
+        page.locator("button.download-btn").first.click()
     download = download_info.value
     download.save_as(save_as)
     print(f"  saved -> {save_as}")
