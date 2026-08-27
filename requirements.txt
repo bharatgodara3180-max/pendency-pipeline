@@ -2,3 +2,5 @@ pandas
 supabase
 python-dotenv
 playwright
+gspread
+google-auth
