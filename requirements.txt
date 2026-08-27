@@ -5,3 +5,4 @@ playwright
 gspread
 google-auth
 python-dateutil
+requests
