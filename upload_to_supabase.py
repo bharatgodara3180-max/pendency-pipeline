@@ -111,24 +111,43 @@ def main():
 
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-    print(f"\nReading FWD file: {FWD_CSV_PATH}")
-    fwd_df = load_csv(FWD_CSV_PATH, FWD_COLUMNS, "FWD")
-    print(f"  {len(fwd_df)} rows")
+    fwd_df = None
+    rev_df = None
 
-    print(f"\nReading REV file: {REV_CSV_PATH}")
-    rev_df = load_csv(REV_CSV_PATH, REV_COLUMNS, "REV")
-    print(f"  {len(rev_df)} rows")
+    if os.path.exists(FWD_CSV_PATH):
+        print(f"\nReading FWD file: {FWD_CSV_PATH}")
+        fwd_df = load_csv(FWD_CSV_PATH, FWD_COLUMNS, "FWD")
+        print(f"  {len(fwd_df)} rows")
+    else:
+        print(f"\nFWD file not found ({FWD_CSV_PATH}) -- skipping FWD this run.")
 
-    print("\nUploading FWD...")
-    replace_current(supabase, "fwd_pendency_current", to_clean_records(fwd_df), captured_at)
+    if os.path.exists(REV_CSV_PATH):
+        print(f"\nReading REV file: {REV_CSV_PATH}")
+        rev_df = load_csv(REV_CSV_PATH, REV_COLUMNS, "REV")
+        print(f"  {len(rev_df)} rows")
+    else:
+        print(f"\nREV file not found ({REV_CSV_PATH}) -- skipping REV this run.")
 
-    print("\nUploading REV...")
-    replace_current(supabase, "rev_pendency_current", to_clean_records(rev_df), captured_at)
+    if fwd_df is None and rev_df is None:
+        sys.exit("Neither FWD nor REV file is present -- nothing to upload.")
+
+    if fwd_df is not None:
+        print("\nUploading FWD...")
+        replace_current(supabase, "fwd_pendency_current", to_clean_records(fwd_df), captured_at)
+
+    if rev_df is not None:
+        print("\nUploading REV...")
+        replace_current(supabase, "rev_pendency_current", to_clean_records(rev_df), captured_at)
 
     print("\nBuilding + uploading trend summary...")
-    summary = summary_rows(fwd_df, "FWD", captured_at) + summary_rows(rev_df, "REV", captured_at)
-    supabase.table("pendency_snapshot_summary").insert(summary).execute()
-    print(f"  inserted {len(summary)} summary rows")
+    summary = []
+    if fwd_df is not None:
+        summary += summary_rows(fwd_df, "FWD", captured_at)
+    if rev_df is not None:
+        summary += summary_rows(rev_df, "REV", captured_at)
+    if summary:
+        supabase.table("pendency_snapshot_summary").insert(summary).execute()
+        print(f"  inserted {len(summary)} summary rows")
 
     print("\nDone — data is live in Supabase.")
 
