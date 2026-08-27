@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 
 import gspread
 import pandas as pd
+import requests
 from dateutil import parser as dateutil_parser
 from google.oauth2.service_account import Credentials
 from supabase import create_client
@@ -33,6 +34,7 @@ AUDIT_SHEET_ID = os.environ.get("AUDIT_SHEET_ID")
 FWD_CSV_PATH = os.environ.get("FWD_CSV_PATH", "fwd_pendency.csv")
 REV_CSV_PATH = os.environ.get("REV_CSV_PATH", "rev_pendency.csv")
 CHUNK_SIZE = 2000  # was 500 -- fewer, larger requests to cut total run time
+NTFY_TOPIC = os.environ.get("NTFY_TOPIC")
 
 if not all([SUPABASE_URL, SUPABASE_KEY, GOOGLE_SERVICE_ACCOUNT_JSON, AUDIT_SHEET_ID]):
     sys.exit(
@@ -266,6 +268,110 @@ def enrich_dataframe(df, lookups, report_type):
     return records
 
 
+def is_ageing_positive(val):
+    if not val:
+        return False
+    s = str(val).strip()
+    if s.lower().endswith("_day"):
+        s = s[:-4]
+    if "+" in s:
+        return True
+    try:
+        return float(s) > 0
+    except ValueError:
+        return False
+
+
+def send_update_alert(topic, r):
+    def line(label, key):
+        return f"{label}: {r.get(key) or '-'}"
+
+    message = "\n".join([
+        line("AWB", "awb_number"),
+        line("Ageing", "aging_bucket"),
+        line("Item Last Updated", "item_last_updated"),
+        line("Blocks", "blocks"),
+        line("Layout Name", "layout_name"),
+        line("Action User", "action_user"),
+        line("Emp Name", "emp_name"),
+        line("Bin Level", "bin_level"),
+        line("Bin Name", "bin_name"),
+        line("Client Name", "client_name"),
+        line("Last Destination", "last_destination"),
+        line("Primary Bin", "primary_bin"),
+        line("Secondary Bin", "secondary_bin"),
+        line("Shipment Type", "shipment_type"),
+    ])
+    try:
+        resp = requests.post(
+            f"https://ntfy.sh/{topic}",
+            data=message.encode("utf-8"),
+            headers={
+                "Title": f"Shipment updated: {r.get('awb_number', '-')}",
+                "Priority": "high",
+                "Tags": "warning",
+            },
+            timeout=15,
+        )
+        print(f"  ntfy status {resp.status_code} for {r.get('awb_number')}")
+    except Exception as e:
+        print(f"  failed to send ntfy alert for {r.get('awb_number')}: {e}")
+
+
+def check_for_updates_and_alert(supabase, records):
+    """For every currently-ageing shipment, compares its item_last_updated
+    against what was seen last run. Alerts only when it genuinely increased
+    (something happened in the WMS) -- never on every pipeline cycle, and
+    never on the very first time an AWB is seen (that just seeds the
+    baseline silently, to avoid an alert-storm on first deployment)."""
+    if not NTFY_TOPIC:
+        print("NTFY_TOPIC not set -- skipping update-detection alerts.")
+        return
+
+    ageing_records = [r for r in records if is_ageing_positive(r.get("aging_bucket"))]
+    if not ageing_records:
+        print("No currently-ageing shipments -- nothing to check for updates.")
+        return
+
+    awbs = list({r["awb_number"] for r in ageing_records})
+    previous = {}
+    LOOKUP_CHUNK = 200
+    for i in range(0, len(awbs), LOOKUP_CHUNK):
+        chunk = awbs[i:i + LOOKUP_CHUNK]
+        resp = (
+            supabase.table("awb_last_seen")
+            .select("awb_number,item_last_updated")
+            .in_("awb_number", chunk)
+            .execute()
+        )
+        for row in resp.data:
+            previous[row["awb_number"]] = row["item_last_updated"]
+
+    to_upsert = []
+    alerts_sent = 0
+    for r in ageing_records:
+        awb = r["awb_number"]
+        current_val = r.get("item_last_updated")
+        prev_val = previous.get(awb)
+
+        if prev_val is None:
+            to_upsert.append({"awb_number": awb, "item_last_updated": current_val})
+            continue
+
+        if current_val and prev_val and str(current_val) > str(prev_val):
+            send_update_alert(NTFY_TOPIC, r)
+            alerts_sent += 1
+            to_upsert.append({"awb_number": awb, "item_last_updated": current_val})
+
+    if to_upsert:
+        for i in range(0, len(to_upsert), CHUNK_SIZE):
+            supabase.table("awb_last_seen").upsert(
+                to_upsert[i:i + CHUNK_SIZE], on_conflict="awb_number"
+            ).execute()
+
+    print(f"Update-detection: checked {len(ageing_records)} ageing shipments, sent {alerts_sent} alerts.")
+
+
 def main():
     captured_at = datetime.now(timezone.utc).isoformat()
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -315,6 +421,9 @@ def main():
         done = min(i + CHUNK_SIZE, total)
         if done % 5000 == 0 or done == total:
             print(f"  {done}/{total} rows")
+
+    print("\nChecking for shipment updates...")
+    check_for_updates_and_alert(supabase, records)
 
     print("Done.")
 
