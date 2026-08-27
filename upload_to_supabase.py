@@ -52,7 +52,7 @@ REV_COLUMNS = [
     "order_type", "doh_flag", "inter_intra_flag",
 ]
 
-CHUNK_SIZE = 2000  # rows per insert request, keeps each request small and reliable
+CHUNK_SIZE = 2000  # was 500 -- fewer, larger requests to cut total run time
 
 
 def load_csv(path, columns, label):
@@ -92,6 +92,7 @@ def replace_current(supabase, table, records, captured_at):
         done = min(i + CHUNK_SIZE, total)
         if done % 10000 == 0 or done == total:
             print(f"    {done}/{total} rows")
+
 
 def summary_rows(df, report_type, captured_at):
     grouped = (
