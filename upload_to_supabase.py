@@ -82,11 +82,16 @@ def replace_current(supabase, table, records, captured_at):
     for r in records:
         r["captured_at"] = captured_at
     print(f"  {table}: clearing previous snapshot...")
-    supabase.table(table).delete().gte("id", 0).execute()
-    print(f"  {table}: inserting {len(records)} rows...")
-    for i in range(0, len(records), CHUNK_SIZE):
+    # Deleting row by row through the API times out on tables this size,
+    # so call the TRUNCATE helper function instead -- it's instant.
+    supabase.rpc("truncate_pendency_table", {"target_table": table}).execute()
+    total = len(records)
+    print(f"  {table}: inserting {total} rows...")
+    for i in range(0, total, CHUNK_SIZE):
         supabase.table(table).insert(records[i:i + CHUNK_SIZE]).execute()
-
+        done = min(i + CHUNK_SIZE, total)
+        if done % 10000 == 0 or done == total:
+            print(f"    {done}/{total} rows")
 
 def summary_rows(df, report_type, captured_at):
     grouped = (
