@@ -4,3 +4,4 @@ python-dotenv
 playwright
 gspread
 google-auth
+python-dateutil
