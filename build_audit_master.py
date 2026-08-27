@@ -266,13 +266,29 @@ def main():
     lookups = build_lookup_maps(ref)
     sync_area_barcodes(supabase, ref)
 
+    fwd_present = os.path.exists(FWD_CSV_PATH)
+    rev_present = os.path.exists(REV_CSV_PATH)
+
+    if not fwd_present or not rev_present:
+        # audit_master is one shared table -- rebuilding it from only one
+        # side would wipe out the other side's rows entirely (the truncate
+        # clears everything). Safer to skip the rebuild this run and keep
+        # the last complete version than to replace it with an incomplete
+        # one. fwd/rev_pendency_current are unaffected by this -- those
+        # already updated correctly in upload_to_supabase.py.
+        missing = "FWD" if not fwd_present else "REV"
+        print(f"{missing} file missing this run -- skipping audit_master rebuild "
+              f"to avoid wiping the other side. Keeping the last complete version.")
+        return
+
+    records = []
     print(f"Reading {FWD_CSV_PATH}...")
     fwd_df = pd.read_csv(FWD_CSV_PATH, dtype=str, na_values=["\\N"], keep_default_na=True)
+    print("Enriching FWD rows...")
+    records += enrich_dataframe(fwd_df, lookups, "FWD")
+
     print(f"Reading {REV_CSV_PATH}...")
     rev_df = pd.read_csv(REV_CSV_PATH, dtype=str, na_values=["\\N"], keep_default_na=True)
-
-    print("Enriching FWD rows...")
-    records = enrich_dataframe(fwd_df, lookups, "FWD")
     print("Enriching REV rows...")
     records += enrich_dataframe(rev_df, lookups, "REV")
 
