@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 
 import gspread
 import pandas as pd
+from dateutil import parser as dateutil_parser
 from google.oauth2.service_account import Credentials
 from supabase import create_client
 
@@ -136,6 +137,18 @@ def build_lookup_maps(ref):
     }
 
 
+def parse_sheet_date(raw):
+    """Google Sheets dates come back as plain text (often DD/MM/YYYY, Indian
+    style), which Postgres will misread or reject outright. Parse explicitly
+    with day-first assumed, rather than letting the database guess."""
+    if not raw or not str(raw).strip():
+        return None
+    try:
+        return dateutil_parser.parse(str(raw).strip(), dayfirst=True).isoformat()
+    except (ValueError, OverflowError):
+        return None
+
+
 def resolve_block(layout_name, awb, lookups):
     override = lookups["exception_blocks_override"].get(awb)
     if override:
@@ -220,7 +233,7 @@ def enrich_dataframe(df, lookups, report_type):
             "secondary_bin": secondary_bin,
             "hour": str(item_last_updated)[11:13] if has_timestamp else None,
             "salvage_type": lookups["exception_salvage"].get(awb, ""),
-            "inbound_date": lookups["exception_inbound_date"].get(awb) or None,
+            "inbound_date": parse_sheet_date(lookups["exception_inbound_date"].get(awb)),
             "block": lookups["exception_block_col"].get(awb, ""),
             "report_type": report_type,
         })
