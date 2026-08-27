@@ -52,7 +52,7 @@ REV_COLUMNS = [
     "order_type", "doh_flag", "inter_intra_flag",
 ]
 
-CHUNK_SIZE = 500  # rows per insert request, keeps each request small and reliable
+CHUNK_SIZE = 2000  # rows per insert request, keeps each request small and reliable
 
 
 def load_csv(path, columns, label):
