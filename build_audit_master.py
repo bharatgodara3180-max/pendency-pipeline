@@ -32,7 +32,7 @@ GOOGLE_SERVICE_ACCOUNT_JSON = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
 AUDIT_SHEET_ID = os.environ.get("AUDIT_SHEET_ID")
 FWD_CSV_PATH = os.environ.get("FWD_CSV_PATH", "fwd_pendency.csv")
 REV_CSV_PATH = os.environ.get("REV_CSV_PATH", "rev_pendency.csv")
-CHUNK_SIZE = 2000
+CHUNK_SIZE = 2000  # was 500 -- fewer, larger requests to cut total run time
 
 if not all([SUPABASE_URL, SUPABASE_KEY, GOOGLE_SERVICE_ACCOUNT_JSON, AUDIT_SHEET_ID]):
     sys.exit(
@@ -63,7 +63,24 @@ def load_reference_sheets():
         "MAPPING": rows("MAPPING"),
         "EMP_DATA": rows("EMP_DATA"),
         "Stagging": rows("Stagging"),
+        "AREA BARCODE": rows("AREA BARCODE"),
     }
+
+
+def sync_area_barcodes(supabase, ref):
+    """Mirrors the AREA BARCODE tab (barcode -> area name) into Supabase.
+    Not used by the audit_master enrichment itself -- only the scan app
+    needs this one, for turning a scanned area QR into a readable name."""
+    rows_ = ref.get("AREA BARCODE", [])[1:]
+    records = [
+        {"barcode": str(r[0]).strip().upper(), "area_name": r[1]}
+        for r in rows_
+        if r and len(r) > 1 and r[0]
+    ]
+    if not records:
+        return
+    print(f"Syncing {len(records)} area barcodes...")
+    supabase.table("area_barcodes").upsert(records, on_conflict="barcode").execute()
 
 
 def build_lookup_maps(ref):
@@ -245,7 +262,9 @@ def main():
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
     print("Loading reference sheets from Google Sheets...")
-    lookups = build_lookup_maps(load_reference_sheets())
+    ref = load_reference_sheets()
+    lookups = build_lookup_maps(ref)
+    sync_area_barcodes(supabase, ref)
 
     print(f"Reading {FWD_CSV_PATH}...")
     fwd_df = pd.read_csv(FWD_CSV_PATH, dtype=str, na_values=["\\N"], keep_default_na=True)
