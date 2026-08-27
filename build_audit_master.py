@@ -54,8 +54,14 @@ def load_reference_sheets():
     gc = gspread.authorize(creds)
     sh = gc.open_by_key(AUDIT_SHEET_ID)
 
-    def rows(tab_name):
-        return sh.worksheet(tab_name).get_all_values()
+    def rows(tab_name, required=True):
+        try:
+            return sh.worksheet(tab_name).get_all_values()
+        except gspread.exceptions.WorksheetNotFound:
+            if required:
+                raise
+            print(f"WARNING: worksheet '{tab_name}' not found -- skipping (non-critical).")
+            return []
 
     return {
         "EXCEPTION": rows("EXCEPTION"),
@@ -63,7 +69,10 @@ def load_reference_sheets():
         "MAPPING": rows("MAPPING"),
         "EMP_DATA": rows("EMP_DATA"),
         "Stagging": rows("Stagging"),
-        "AREA BARCODE": rows("AREA BARCODE"),
+        # Not used by audit_master enrichment itself -- only feeds the scan
+        # app's area-name lookup. A missing/renamed tab here should never
+        # break the actual pendency/audit pipeline.
+        "AREA BARCODE": rows("AREA BARCODE", required=False),
     }
 
 
