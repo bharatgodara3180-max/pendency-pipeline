@@ -41,29 +41,46 @@ def click_login(page):
     return False
 
 
-def download_report(page, save_as):
-    page.locator("button.dwnld-btn").click()
-    page.get_by_role("button", name="Apply & Download").click()
+def download_report(page, save_as, attempts=3):
+    """Clicks Apply & Download, waits for the file to be generated, and
+    downloads it. If it never becomes ready, re-clicks Apply & Download
+    from scratch (up to `attempts` times) rather than giving up after one
+    try -- the portal occasionally doesn't start generating the file at all,
+    and a fresh click resolves it."""
+    last_error = None
+    for attempt_num in range(1, attempts + 1):
+        try:
+            page.locator("button.dwnld-btn").click()
+            page.get_by_role("button", name="Apply & Download").click()
 
-    # File is generated server-side -- poll until it's ready, hitting
-    # Refresh each time, up to ~2 minutes.
-    for attempt in range(20):
-        page.wait_for_timeout(6000)
-        if page.locator("button.download-btn").count() > 0:
-            break
-        refresh = page.locator("button.download-chk-btn")
-        if refresh.count() > 0:
-            try:
-                refresh.first.click()
-            except Exception:
-                pass
-    else:
-        raise RuntimeError(f"{save_as}: file never became ready to download.")
+            ready = False
+            for _ in range(20):  # ~2 minutes
+                page.wait_for_timeout(6000)
+                if page.locator("button.download-btn").count() > 0:
+                    ready = True
+                    break
+                refresh = page.locator("button.download-chk-btn")
+                if refresh.count() > 0:
+                    try:
+                        refresh.first.click()
+                    except Exception:
+                        pass
 
-    with page.expect_download(timeout=120000) as download_info:
-        page.locator("button.download-btn").first.click()
-    download_info.value.save_as(save_as)
-    print(f"  saved -> {save_as}")
+            if not ready:
+                raise RuntimeError(f"{save_as}: file never became ready (attempt {attempt_num}/{attempts}).")
+
+            with page.expect_download(timeout=120000) as download_info:
+                page.locator("button.download-btn").first.click()
+            download_info.value.save_as(save_as)
+            print(f"  saved -> {save_as} (attempt {attempt_num})")
+            return
+        except Exception as e:
+            last_error = e
+            print(f"  attempt {attempt_num}/{attempts} for {save_as} failed: {e}")
+            if attempt_num < attempts:
+                print("  retrying from scratch...")
+
+    raise RuntimeError(f"{save_as}: all {attempts} attempts failed. Last error: {last_error}")
 
 
 def main():
@@ -89,15 +106,45 @@ def main():
                 print(f"Going to {FWD_URL} again after login...")
                 page.goto(FWD_URL, wait_until="networkidle")
 
+            results = {"fwd": False, "rev": False}
+
             print("Downloading FWD...")
-            download_report(page, "fwd_pendency.csv")
+            try:
+                download_report(page, "fwd_pendency.csv")
+                results["fwd"] = True
+            except Exception as e:
+                print(f"FWD download failed after retries: {e}")
 
             print(f"Going to {REV_URL} ...")
-            page.goto(REV_URL, wait_until="networkidle")
-            print("Downloading REV...")
-            download_report(page, "rev_pendency.csv")
+            try:
+                page.goto(REV_URL, wait_until="networkidle")
+                if "Please login" in page.content():
+                    print("Logging in again for REV...")
+                    if not click_login(page):
+                        raise RuntimeError("Could not click the Login button.")
+                    page.locator("#input_ecom_username").fill(USERNAME)
+                    page.locator("#input_ecom_password").fill(PASSWORD)
+                    page.locator("#btn_ecom_signin").click()
+                    page.locator("#input_ecom_username").wait_for(state="hidden", timeout=60000)
+                    page.wait_for_timeout(5000)
+                    page.goto(REV_URL, wait_until="networkidle")
+                print("Downloading REV...")
+                download_report(page, "rev_pendency.csv")
+                results["rev"] = True
+            except Exception as e:
+                print(f"REV download failed after retries: {e}")
 
-            print("\nBoth files downloaded successfully.")
+            if not results["fwd"] and not results["rev"]:
+                os.makedirs(SCREENSHOT_DIR, exist_ok=True)
+                page.screenshot(path=os.path.join(SCREENSHOT_DIR, "failure.png"), full_page=True)
+                raise RuntimeError("Both FWD and REV downloads failed -- nothing to push this run.")
+
+            if not results["fwd"]:
+                print("\nWARNING: FWD failed, continuing with REV only.")
+            if not results["rev"]:
+                print("\nWARNING: REV failed, continuing with FWD only.")
+            if results["fwd"] and results["rev"]:
+                print("\nBoth files downloaded successfully.")
         except Exception as e:
             os.makedirs(SCREENSHOT_DIR, exist_ok=True)
             page.screenshot(path=os.path.join(SCREENSHOT_DIR, "failure.png"), full_page=True)
