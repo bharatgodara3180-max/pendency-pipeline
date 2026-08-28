@@ -271,6 +271,11 @@ def enrich_dataframe(df, lookups, report_type):
 
 
 def is_ageing_positive(val):
+    """"+1" for these automated features means 2_day and above -- 0_day and
+    1_day are explicitly excluded here. Note this is a DIFFERENT, narrower
+    definition than the scan app's own "Found" check (which flags anything
+    above 0_day) -- that one stays untouched since it's long-established
+    and working."""
     if not val:
         return False
     s = str(val).strip()
@@ -279,7 +284,7 @@ def is_ageing_positive(val):
     if "+" in s:
         return True
     try:
-        return float(s) > 0
+        return float(s) >= 2
     except ValueError:
         return False
 
