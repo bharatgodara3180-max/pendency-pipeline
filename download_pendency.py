@@ -41,6 +41,15 @@ def click_login(page):
     return False
 
 
+def wait_for_page_settle(page):
+    """networkidle only means network requests stopped -- it does NOT mean
+    the Angular app finished its own internal data-fetch/render cycle
+    (confirmed via a screenshot showing a loading spinner still spinning
+    mid-table well after networkidle fired). This gives it real time to
+    finish before we try clicking anything on the page."""
+    page.wait_for_timeout(5000)
+
+
 def download_report(page, save_as, attempts=3):
     """Clicks Apply & Download, waits for the file to be generated, and
     downloads it. If it never becomes ready, re-clicks Apply & Download
@@ -96,6 +105,7 @@ def main():
         try:
             print(f"Going to {FWD_URL} ...")
             page.goto(FWD_URL, wait_until="networkidle")
+            wait_for_page_settle(page)
 
             if "Please login" in page.content():
                 print("Logging in...")
@@ -110,6 +120,7 @@ def main():
 
                 print(f"Going to {FWD_URL} again after login...")
                 page.goto(FWD_URL, wait_until="networkidle")
+            wait_for_page_settle(page)
 
             results = {"fwd": False, "rev": False}
 
@@ -125,6 +136,7 @@ def main():
             print(f"Going to {REV_URL} ...")
             try:
                 page.goto(REV_URL, wait_until="networkidle")
+                wait_for_page_settle(page)
                 if "Please login" in page.content():
                     print("Logging in again for REV...")
                     if not click_login(page):
@@ -135,6 +147,7 @@ def main():
                     page.locator("#input_ecom_username").wait_for(state="hidden", timeout=60000)
                     page.wait_for_timeout(5000)
                     page.goto(REV_URL, wait_until="networkidle")
+                wait_for_page_settle(page)
                 print("Downloading REV...")
                 download_report(page, "rev_pendency.csv")
                 results["rev"] = True
