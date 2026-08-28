@@ -139,9 +139,13 @@ def build_lookup_maps(ref):
     mapping_ab = {r[0].strip(): r[1].strip() for r in map_rows if len(r) > 1 and r[0].strip()}
     mapping_d_to_h = {r[3].strip(): r[7].strip() for r in map_rows if len(r) > 7 and r[3].strip()}
 
-    # EMP_DATA: A = action_user id, B = employee name
+    # EMP_DATA: A = action_user id, B = employee name, D = employee's
+    # default/assigned block (used as a fallback when layout matching fails)
     emp_rows = ref["EMP_DATA"][1:]
     emp_map = {str(r[0]).strip(): r[1].strip() for r in emp_rows if len(r) > 1 and r[0]}
+    emp_default_block_map = {
+        str(r[0]).strip(): r[3].strip() for r in emp_rows if len(r) > 3 and r[0] and r[3]
+    }
 
     # Stagging: A=Zone, B=Cage, C=Next_Destination, D=Zone+Cage key, E=category
     stag_rows = ref["Stagging"][1:]
@@ -159,6 +163,7 @@ def build_lookup_maps(ref):
         "mapping_ab": mapping_ab,
         "mapping_d_to_h": mapping_d_to_h,
         "emp_map": emp_map,
+        "emp_default_block_map": emp_default_block_map,
         "stagging_c_to_d": stagging_c_to_d,
         "stagging_d_to_c": stagging_d_to_c,
         "stagging_d_to_e": stagging_d_to_e,
@@ -177,14 +182,17 @@ def parse_sheet_date(raw):
         return None
 
 
-def resolve_block(layout_name, awb, lookups):
+def resolve_block(layout_name, awb, action_user, lookups):
     override = lookups["exception_blocks_override"].get(awb)
     if override:
         return override
     for block_name, layout_set in lookups["block_layout_sets"].items():
         if layout_name in layout_set:
             return block_name
-    return "Block A"  # matches the original formula's own fallback
+    fallback = lookups["emp_default_block_map"].get(str(action_user).strip())
+    if fallback:
+        return fallback
+    return "Unknown"
 
 
 def enrich_rdcpfc_style(row, lookups):
@@ -257,7 +265,7 @@ def enrich_dataframe(df, lookups, report_type):
             "pendency_type": pendency_type,
             "shipment_type": row.get("shipment_type") if "shipment_type" in row else None,
             "emp_name": lookups["emp_map"].get(str(action_user).strip(), ""),
-            "blocks": resolve_block(layout_name, awb, lookups),
+            "blocks": resolve_block(layout_name, awb, action_user, lookups),
             "last_destination": last_destination,
             "primary_bin": primary_bin,
             "secondary_bin": secondary_bin,
