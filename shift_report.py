@@ -67,7 +67,10 @@ def fmt_ist(dt):
 
 
 def send_ntfy(topic, shift_label, window_start, window_end, matrix):
-    lines = [f"Window: {fmt_ist(window_start)} - {fmt_ist(window_end)} IST", ""]
+    # ntfy doesn't render Markdown tables reliably (confirmed -- even the
+    # Android app doesn't support them), so this uses inline "|" separated
+    # counts per line instead of columns that need to actually line up.
+    lines = [f"*Window: {fmt_ist(window_start)} - {fmt_ist(window_end)} IST*", "*(each number below is scanned/closed)*", ""]
     total_scanned = 0
     total_closed = 0
 
@@ -75,19 +78,24 @@ def send_ntfy(topic, shift_label, window_start, window_end, matrix):
         lines.append("No +1 ageing (2_day+) shipments scanned this shift.")
     else:
         for rt in sorted(matrix.keys()):
-            lines.append(f"=== {rt} ===")
+            rt_scanned = sum(v["scanned"] for cat in matrix[rt].values() for v in cat.values())
+            rt_closed = sum(v["closed"] for cat in matrix[rt].values() for v in cat.values())
+            lines.append(f"**{rt} — {rt_scanned} scanned, {rt_closed} closed**")
             for cat in sorted(matrix[rt].keys()):
                 cat_scanned = sum(v["scanned"] for v in matrix[rt][cat].values())
                 cat_closed = sum(v["closed"] for v in matrix[rt][cat].values())
-                lines.append(f"{cat}: {cat_scanned} scanned, {cat_closed} closed")
+                lines.append(f"• {cat} ({cat_scanned} scanned, {cat_closed} closed)")
+                parts = []
                 for aging in AGING_ORDER:
                     if aging in matrix[rt][cat]:
                         v = matrix[rt][cat][aging]
-                        lines.append(f"    {aging}: {v['scanned']} scanned, {v['closed']} closed")
+                        parts.append(f"{aging}: {v['scanned']}/{v['closed']}")
                         total_scanned += v["scanned"]
                         total_closed += v["closed"]
+                if parts:
+                    lines.append("   " + "  |  ".join(parts))
             lines.append("")
-        lines.append(f"TOTAL: {total_scanned} scanned, {total_closed} closed")
+        lines.append(f"**TOTAL: {total_scanned} scanned, {total_closed} closed**")
 
     message = "\n".join(lines)
     try:
@@ -98,6 +106,7 @@ def send_ntfy(topic, shift_label, window_start, window_end, matrix):
                 "Title": f"Shift Report: {shift_label}",
                 "Priority": "default",
                 "Tags": "bar_chart",
+                "Markdown": "yes",
             },
             timeout=15,
         )
