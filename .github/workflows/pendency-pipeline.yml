@@ -32,7 +32,7 @@ jobs:
         run: python download_pendency.py
 
       - name: Upload debug screenshots
-        if: failure()   # only runs (and only exists) when something actually failed
+        if: always()   # runs every time now -- a partial FWD/REV failure doesn't fail the whole step, so failure() alone would miss it
         uses: actions/upload-artifact@v7
         with:
           name: debug-screenshots
