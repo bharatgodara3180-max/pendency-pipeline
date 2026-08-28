@@ -304,6 +304,7 @@ def send_update_alert(topic, r):
         line("Bin Level", "bin_level"),
         line("Bin Name", "bin_name"),
         line("Client Name", "client_name"),
+        line("Last Destination", "last_destination"),
         line("Shipment Type", "shipment_type"),
     ])
     try:
@@ -371,6 +372,7 @@ def check_for_updates_and_alert(supabase, records):
                 "aging_bucket": r.get("aging_bucket"),
                 "pendency_type": r.get("pendency_type"),
                 "report_type": r.get("report_type"),
+                "last_destination": r.get("last_destination"),
             }).execute()
 
     if to_upsert:
