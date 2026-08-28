@@ -117,11 +117,11 @@ def main():
     print(f"Fetching scans between {window_start.isoformat()} and {now.isoformat()}...")
     scans = fetch_all(
         supabase, "audit_scans",
-        "awb_number, aging_bucket, pendency, report_type, scanned_at",
+        "awb_number, ageing, pendency, report_type, scanned_at",
         apply_filters=lambda q: q.gte("scanned_at", window_start.isoformat()).lte("scanned_at", now.isoformat()),
     )
 
-    ageing_scans = [s for s in scans if is_ageing_positive(s.get("aging_bucket"))]
+    ageing_scans = [s for s in scans if is_ageing_positive(s.get("ageing"))]
     print(f"  {len(scans)} total scans, {len(ageing_scans)} were +1 ageing (2_day+)")
 
     if not ageing_scans:
@@ -151,7 +151,7 @@ def main():
     for s in ageing_scans:
         rt = s.get("report_type") or "UNKNOWN"
         cat = s.get("pendency") or "UNKNOWN"
-        aging = s.get("aging_bucket")
+        aging = s.get("ageing")
         matrix.setdefault(rt, {}).setdefault(cat, {}).setdefault(aging, {"scanned": 0, "closed": 0})
         matrix[rt][cat][aging]["scanned"] += 1
         if s["awb_number"] not in still_ageing:
