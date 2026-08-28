@@ -366,6 +366,12 @@ def check_for_updates_and_alert(supabase, records):
             send_update_alert(NTFY_TOPIC, r)
             alerts_sent += 1
             to_upsert.append({"awb_number": awb, "item_last_updated": current_val})
+            supabase.table("awb_update_alerts").insert({
+                "awb_number": awb,
+                "aging_bucket": r.get("aging_bucket"),
+                "pendency_type": r.get("pendency_type"),
+                "report_type": r.get("report_type"),
+            }).execute()
 
     if to_upsert:
         for i in range(0, len(to_upsert), CHUNK_SIZE):
