@@ -220,9 +220,17 @@ def enrich_at_dockbrsnr_style(row, lookups):
     return primary_bin, secondary_bin, last_destination
 
 
-def enrich_rev_style(is_at_dockbrsnr_variant):
+def enrich_rev_style(row, is_at_dockbrsnr_variant):
     secondary = "Block B" if is_at_dockbrsnr_variant else "REV PROCESSING AREA"
-    return "CFGR", secondary, "TAURU_DC_FMRTS"
+
+    item_destination = str(row.get("item_destination_name") or "").strip()
+
+    if item_destination == "NBP_DC_FMRTS":
+        last_destination = "NBP_DC_FMRTS"
+    else:
+        last_destination = "TAURU_DC_FMRTS"
+
+    return "CFGR", secondary, last_destination
 
 
 def enrich_dataframe(df, lookups, report_type):
@@ -236,12 +244,12 @@ def enrich_dataframe(df, lookups, report_type):
             if report_type == "FWD":
                 primary_bin, secondary_bin, last_destination = enrich_rdcpfc_style(row, lookups)
             else:
-                primary_bin, secondary_bin, last_destination = enrich_rev_style(False)
+                primary_bin, secondary_bin, last_destination = enrich_rev_style(row, False)
         elif category in AT_DOCKBRSNR_CATEGORIES:
             if report_type == "FWD":
                 primary_bin, secondary_bin, last_destination = enrich_at_dockbrsnr_style(row, lookups)
             else:
-                primary_bin, secondary_bin, last_destination = enrich_rev_style(True)
+                primary_bin, secondary_bin, last_destination = enrich_rev_style(row, True)
         else:
             primary_bin, secondary_bin, last_destination = "", "", ""
 
