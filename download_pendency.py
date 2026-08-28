@@ -119,6 +119,8 @@ def main():
                 results["fwd"] = True
             except Exception as e:
                 print(f"FWD download failed after retries: {e}")
+                os.makedirs(SCREENSHOT_DIR, exist_ok=True)
+                page.screenshot(path=os.path.join(SCREENSHOT_DIR, "fwd_failure.png"), full_page=True)
 
             print(f"Going to {REV_URL} ...")
             try:
@@ -138,6 +140,8 @@ def main():
                 results["rev"] = True
             except Exception as e:
                 print(f"REV download failed after retries: {e}")
+                os.makedirs(SCREENSHOT_DIR, exist_ok=True)
+                page.screenshot(path=os.path.join(SCREENSHOT_DIR, "rev_failure.png"), full_page=True)
 
             if not results["fwd"] and not results["rev"]:
                 os.makedirs(SCREENSHOT_DIR, exist_ok=True)
