@@ -46,12 +46,17 @@ def download_report(page, save_as, attempts=3):
     downloads it. If it never becomes ready, re-clicks Apply & Download
     from scratch (up to `attempts` times) rather than giving up after one
     try -- the portal occasionally doesn't start generating the file at all,
-    and a fresh click resolves it."""
+    and a fresh click resolves it.
+
+    All clicks use force=True: a dark modal backdrop (Angular Material's
+    CDK overlay) sometimes sits on top of these buttons and blocks a
+    normal click for a long time before Playwright gives up -- forcing
+    skips that check and clicks through it immediately."""
     last_error = None
     for attempt_num in range(1, attempts + 1):
         try:
-            page.locator("button.dwnld-btn").click()
-            page.get_by_role("button", name="Apply & Download").click()
+            page.locator("button.dwnld-btn").click(force=True)
+            page.get_by_role("button", name="Apply & Download").click(force=True)
 
             ready = False
             for _ in range(20):  # ~2 minutes
@@ -62,7 +67,7 @@ def download_report(page, save_as, attempts=3):
                 refresh = page.locator("button.download-chk-btn")
                 if refresh.count() > 0:
                     try:
-                        refresh.first.click()
+                        refresh.first.click(force=True)
                     except Exception:
                         pass
 
@@ -70,7 +75,7 @@ def download_report(page, save_as, attempts=3):
                 raise RuntimeError(f"{save_as}: file never became ready (attempt {attempt_num}/{attempts}).")
 
             with page.expect_download(timeout=120000) as download_info:
-                page.locator("button.download-btn").first.click()
+                page.locator("button.download-btn").first.click(force=True)
             download_info.value.save_as(save_as)
             print(f"  saved -> {save_as} (attempt {attempt_num})")
             return
