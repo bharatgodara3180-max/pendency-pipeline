@@ -244,6 +244,8 @@ def enrich_dataframe(df, lookups, report_type):
 
         records.append({
             "awb_number": awb,
+            "manifest_code": row.get("manifest_code"),
+            "seal_number": row.get("seal_number"),
             "aging_bucket": row.get("aging_bucket"),
             "action_user": action_user,
             "bin_level": row.get("bin_level"),
@@ -297,9 +299,6 @@ def send_update_alert(topic, r):
         line("Bin Level", "bin_level"),
         line("Bin Name", "bin_name"),
         line("Client Name", "client_name"),
-        line("Last Destination", "last_destination"),
-        line("Primary Bin", "primary_bin"),
-        line("Secondary Bin", "secondary_bin"),
         line("Shipment Type", "shipment_type"),
     ])
     try:
