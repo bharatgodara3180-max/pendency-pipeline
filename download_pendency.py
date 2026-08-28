@@ -50,7 +50,7 @@ def wait_for_page_settle(page):
     page.wait_for_timeout(5000)
 
 
-def download_report(page, save_as, attempts=3):
+def download_report(page, save_as, attempts=1):
     """Clicks Apply & Download, waits for the file to be generated, and
     downloads it. If it never becomes ready, re-clicks Apply & Download
     from scratch (up to `attempts` times) rather than giving up after one
