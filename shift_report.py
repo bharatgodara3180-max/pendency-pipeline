@@ -70,21 +70,21 @@ def send_ntfy(topic, shift_label, window_start, window_end, matrix):
     # ntfy doesn't render Markdown tables reliably (confirmed -- even the
     # Android app doesn't support them), so this uses inline "|" separated
     # counts per line instead of columns that need to actually line up.
-    lines = [f"*Window: {fmt_ist(window_start)} - {fmt_ist(window_end)} IST*", "*(each number below is scanned/closed)*", ""]
+    lines = [f"Window: {fmt_ist(window_start)} - {fmt_ist(window_end)} IST", "(each number below is scanned+auto-detected/closed)", ""]
     total_scanned = 0
     total_closed = 0
 
     if not matrix:
-        lines.append("No +1 ageing (2_day+) shipments scanned this shift.")
+        lines.append("Nothing scanned or auto-detected this shift.")
     else:
         for rt in sorted(matrix.keys()):
             rt_scanned = sum(v["scanned"] for cat in matrix[rt].values() for v in cat.values())
             rt_closed = sum(v["closed"] for cat in matrix[rt].values() for v in cat.values())
-            lines.append(f"**{rt} — {rt_scanned} scanned, {rt_closed} closed**")
+            lines.append(f"{rt} -- {rt_scanned} total, {rt_closed} closed")
             for cat in sorted(matrix[rt].keys()):
                 cat_scanned = sum(v["scanned"] for v in matrix[rt][cat].values())
                 cat_closed = sum(v["closed"] for v in matrix[rt][cat].values())
-                lines.append(f"• {cat} ({cat_scanned} scanned, {cat_closed} closed)")
+                lines.append(f"• {cat} ({cat_scanned} total, {cat_closed} closed)")
                 parts = []
                 for aging in AGING_ORDER:
                     if aging in matrix[rt][cat]:
@@ -95,7 +95,7 @@ def send_ntfy(topic, shift_label, window_start, window_end, matrix):
                 if parts:
                     lines.append("   " + "  |  ".join(parts))
             lines.append("")
-        lines.append(f"**TOTAL: {total_scanned} scanned, {total_closed} closed**")
+        lines.append(f"TOTAL: {total_scanned} shipments, {total_closed} closed")
 
     message = "\n".join(lines)
     try:
@@ -106,7 +106,6 @@ def send_ntfy(topic, shift_label, window_start, window_end, matrix):
                 "Title": f"Shift Report: {shift_label}",
                 "Priority": "default",
                 "Tags": "bar_chart",
-                "Markdown": "yes",
             },
             timeout=15,
         )
@@ -129,19 +128,45 @@ def main():
         "awb_number, ageing, pendency, report_type, scanned_at",
         apply_filters=lambda q: q.gte("scanned_at", window_start.isoformat()).lte("scanned_at", now.isoformat()),
     )
+    ageing_scans = [
+        s for s in scans
+        if is_ageing_positive(s.get("ageing")) and s.get("report_type")
+    ]
+    print(f"  {len(scans)} total scans, {len(ageing_scans)} were +1 ageing (2_day+) with a known FWD/REV type")
 
-    ageing_scans = [s for s in scans if is_ageing_positive(s.get("ageing"))]
-    print(f"  {len(scans)} total scans, {len(ageing_scans)} were +1 ageing (2_day+)")
+    print("Fetching automated update-detection alerts for this window...")
+    auto_alerts = fetch_all(
+        supabase, "awb_update_alerts",
+        "awb_number, aging_bucket, pendency_type, report_type, detected_at",
+        apply_filters=lambda q: q.gte("detected_at", window_start.isoformat()).lte("detected_at", now.isoformat()),
+    )
+    print(f"  {len(auto_alerts)} automated update alerts this window")
 
-    if not ageing_scans:
+    # Merge both sources into ONE combined set, keyed by AWB, so a shipment
+    # that was both scanned AND auto-detected in the same window is counted
+    # once, not twice. Scan data wins if both exist for the same AWB.
+    combined = {}
+    for a in auto_alerts:
+        combined[a["awb_number"]] = {
+            "report_type": a.get("report_type") or "UNKNOWN",
+            "category": a.get("pendency_type") or "UNKNOWN",
+            "aging": a.get("aging_bucket"),
+        }
+    for s in ageing_scans:
+        combined[s["awb_number"]] = {
+            "report_type": s.get("report_type") or "UNKNOWN",
+            "category": s.get("pendency") or "UNKNOWN",
+            "aging": s.get("ageing"),
+        }
+
+    if not combined:
         send_ntfy(NTFY_SHIFT_TOPIC, shift_label, window_start, now, {})
-        print("No +1 ageing scans this shift -- sent empty report.")
+        print("Nothing scanned or auto-detected this shift -- sent empty report.")
         return
 
-    awbs = list({s["awb_number"] for s in ageing_scans})
-    print(f"Checking current status of {len(awbs)} scanned AWBs against latest audit_master...")
-
+    print(f"Checking current status of {len(combined)} shipments against latest audit_master...")
     still_ageing = set()
+    awbs = list(combined.keys())
     CHUNK = 200
     for i in range(0, len(awbs), CHUNK):
         chunk = awbs[i:i + CHUNK]
@@ -156,14 +181,13 @@ def main():
                 still_ageing.add(row["awb_number"])
 
     # matrix[report_type][category][aging_bucket] = {"scanned": n, "closed": n}
+    # "scanned" here means "known" -- via a human scan OR auto-detection.
     matrix = {}
-    for s in ageing_scans:
-        rt = s.get("report_type") or "UNKNOWN"
-        cat = s.get("pendency") or "UNKNOWN"
-        aging = s.get("ageing")
+    for awb, info in combined.items():
+        rt, cat, aging = info["report_type"], info["category"], info["aging"]
         matrix.setdefault(rt, {}).setdefault(cat, {}).setdefault(aging, {"scanned": 0, "closed": 0})
         matrix[rt][cat][aging]["scanned"] += 1
-        if s["awb_number"] not in still_ageing:
+        if awb not in still_ageing:
             matrix[rt][cat][aging]["closed"] += 1
 
     send_ntfy(NTFY_SHIFT_TOPIC, shift_label, window_start, now, matrix)
