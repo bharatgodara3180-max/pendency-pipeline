@@ -71,28 +71,7 @@ def load_reference_sheets():
         "MAPPING": rows("MAPPING"),
         "EMP_DATA": rows("EMP_DATA"),
         "Stagging": rows("Stagging"),
-        # Not used by audit_master enrichment itself -- only feeds the scan
-        # app's area-name lookup. A missing/renamed tab here should never
-        # break the actual pendency/audit pipeline.
-        "AREA BARCODE": rows("AREA BARCODE", required=False),
     }
-
-
-def sync_area_barcodes(supabase, ref):
-    """Mirrors the AREA BARCODE tab (barcode -> area name) into Supabase.
-    Not used by the audit_master enrichment itself -- only the scan app
-    needs this one, for turning a scanned area QR into a readable name."""
-    rows_ = ref.get("AREA BARCODE", [])[1:]
-    records = [
-        {"barcode": str(r[0]).strip().upper(), "area_name": r[1]}
-        for r in rows_
-        if r and len(r) > 1 and r[0]
-    ]
-    if not records:
-        return
-    print(f"Syncing {len(records)} area barcodes...")
-    supabase.table("area_barcodes").upsert(records, on_conflict="barcode").execute()
-
 
 def build_lookup_maps(ref):
     # EXCEPTION columns: A=AWB, B=Category, C=Moved to GA, D=POC,
@@ -407,7 +386,6 @@ def main():
     print("Loading reference sheets from Google Sheets...")
     ref = load_reference_sheets()
     lookups = build_lookup_maps(ref)
-    sync_area_barcodes(supabase, ref)
 
     fwd_present = os.path.exists(FWD_CSV_PATH)
     rev_present = os.path.exists(REV_CSV_PATH)
