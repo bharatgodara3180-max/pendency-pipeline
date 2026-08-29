@@ -2,11 +2,6 @@ name: Shift Report
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '5 8 * * *'
-      timezone: 'Asia/Kolkata'   # 8:05 AM IST -- night shift (8PM-8AM) report
-    - cron: '5 20 * * *'
-      timezone: 'Asia/Kolkata'   # 8:05 PM IST -- day shift (8AM-8PM) report
 
 jobs:
   send-report:
