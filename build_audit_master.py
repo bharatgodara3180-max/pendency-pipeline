@@ -333,6 +333,13 @@ def check_for_updates_and_alert(supabase, records):
         print("No currently-ageing shipments -- nothing to check for updates.")
         return
 
+    unique_records = {}
+    for r in ageing_records:
+        awb = r["awb_number"]
+        if awb not in unique_records or str(r.get("item_last_updated") or "") > str(unique_records[awb].get("item_last_updated") or ""):
+            unique_records[awb] = r
+    ageing_records = list(unique_records.values())
+
     awbs = list({r["awb_number"] for r in ageing_records})
     previous = {}
     LOOKUP_CHUNK = 200
