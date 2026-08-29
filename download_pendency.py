@@ -69,10 +69,17 @@ def download_report(page, save_as, attempts=1):
 
             ready = False
             for _ in range(20):  # ~2 minutes
-                page.wait_for_timeout(6000)
-                if page.locator("button.download-btn").count() > 0:
-                    ready = True
-                    break
+    page.wait_for_timeout(6000)
+    download_button = page.locator("button.download-btn").first
+
+    try:
+        download_button.wait_for(state="visible", timeout=3000)
+
+        if download_button.is_enabled():
+            ready = True
+            break
+    except Exception:
+        pass
                 refresh = page.locator("button.download-chk-btn")
                 if refresh.count() > 0:
                     try:
@@ -84,7 +91,7 @@ def download_report(page, save_as, attempts=1):
                 raise RuntimeError(f"{save_as}: file never became ready (attempt {attempt_num}/{attempts}).")
 
             with page.expect_download(timeout=120000) as download_info:
-                page.locator("button.download-btn").first.click(force=True)
+    download_button.click(force=True)
             download_info.value.save_as(save_as)
             print(f"  saved -> {save_as} (attempt {attempt_num})")
             return
