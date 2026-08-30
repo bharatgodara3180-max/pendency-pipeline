@@ -487,19 +487,16 @@ def send_stage_alert(topic, title, message):
 
 def check_stage_transitions_and_alert(supabase, records):
     """Tracks each FWD shipment's PFC -> RDC (bin) -> At Dock movement
-    across pipeline runs and alerts on every stage change:
-      PFC -> RDC bin X            (received at DC)
-      RDC bin X -> RDC bin Y      (moved bins, e.g. waiting for seal number)
-      RDC bin X -> At Dock        (sealed into a bag)
-    If a shipment disappears from the FWD data entirely (cleared from
-    pendency) while its last known stage was At Dock, that's the normal,
-    expected end of the flow -- no alert. If it disappears from ANY other
-    stage (PFC or RDC, never having shown up at At Dock), that's an
-    anomaly -- skipped straight to cleared -- and goes to its own separate
-    ntfy channel + its own table instead of the normal alert stream."""
-    if not (NTFY_TOPIC or NTFY_TOPIC_REV or NTFY_TOPIC_SKIP):
-        print("No ntfy topics configured -- skipping stage-transition tracking.")
-        return
+    across pipeline runs, silently -- normal stage-to-stage movement does
+    NOT send any notification. The only thing this actually alerts on is
+    a shipment disappearing from the FWD data (cleared from pendency)
+    while its last known stage was PFC or RDC -- i.e. it never showed up
+    "At Dock" first. That's an anomaly, and goes to its own separate ntfy
+    channel (NTFY_TOPIC_SKIP) + its own table. Disappearing while at
+    At Dock is the normal, expected end of the flow -- no alert either
+    way."""
+    if not NTFY_TOPIC_SKIP:
+        print("NTFY_TOPIC_SKIP not set -- stage tracking will still run (needed for skip-detection state) but no skip alerts can be sent.")
 
     current_by_awb = {}
     for r in records:
@@ -528,7 +525,6 @@ def check_stage_transitions_and_alert(supabase, records):
 
     to_upsert = []
     to_delete = []
-    transition_alerts = 0
     skip_alerts = 0
 
     for awb, (label, key, r) in current_by_awb.items():
@@ -540,16 +536,10 @@ def check_stage_transitions_and_alert(supabase, records):
             continue
 
         prev_label, prev_key = prev
-        if prev_key != key:
-            message = "\n".join([
-                f"AWB: {awb}",
-                f"Moved: {prev_label} -> {label}",
-                f"Seal Number: {r.get('seal_number') or '-'}",
-                f"Client: {r.get('client_name') or '-'}",
-                f"Layout: {r.get('layout_name') or '-'}",
-            ])
-            send_stage_alert(NTFY_TOPIC, f"Stage moved: {awb}", message)
-            transition_alerts += 1
+        # Normal stage-to-stage movement (PFC -> RDC, RDC bin X -> bin Y,
+        # RDC -> At Dock) is tracked silently -- no notification for these
+        # anymore. Only the skip-detection below (stage disappearing
+        # without reaching At Dock) actually alerts.
         to_upsert.append({"awb_number": awb, "stage_key": key, "stage_label": label})
 
     # Anything still left in `previous` was tracked last run but isn't in
@@ -557,6 +547,7 @@ def check_stage_transitions_and_alert(supabase, records):
     for awb, (prev_label, prev_key) in previous.items():
         to_delete.append(awb)
         if prev_key != "AT_DOCK":
+            # PFC or RDC -> gone, without ever reaching At Dock first.
             message = "\n".join([
                 f"AWB: {awb}",
                 f"Last seen at: {prev_label}",
@@ -568,6 +559,7 @@ def check_stage_transitions_and_alert(supabase, records):
                 "last_seen_stage": prev_label,
             }).execute()
             skip_alerts += 1
+        # prev_key == "AT_DOCK" -> normal, expected clearance. No alert.
 
     if to_upsert:
         for i in range(0, len(to_upsert), CHUNK_SIZE):
@@ -583,7 +575,7 @@ def check_stage_transitions_and_alert(supabase, records):
 
     purge_old_rows(supabase, "awb_stage_skip_alerts")
 
-    print(f"Stage-tracking: {transition_alerts} stage-change alerts, {skip_alerts} skip alerts.")
+    print(f"Stage-tracking: {skip_alerts} skip alerts (normal stage moves are tracked silently, no notification).")
 
 
 def main():
