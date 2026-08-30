@@ -272,21 +272,37 @@ def enrich_dataframe(df, lookups, report_type):
     return records
 
 
-def is_ageing_positive(val):
-    """"+1" here now means 1_day and above -- previously this required
-    2_day+ (0_day and 1_day excluded); changed so the alert system fires
-    as soon as a shipment crosses into day+1."""
+def _ageing_days(val):
+    """Parses an aging_bucket string ("0_day", "3_day", "6+_day") into a
+    plain number for threshold comparisons. Returns None if unparseable."""
     if not val:
-        return False
+        return None
     s = str(val).strip()
     if s.lower().endswith("_day"):
         s = s[:-4]
     if "+" in s:
-        return True
+        return 99
     try:
-        return float(s) >= 1
+        return float(s)
     except ValueError:
-        return False
+        return None
+
+
+def is_tracked(val):
+    """1_day and above -- a baseline item_last_updated gets recorded
+    starting here, so a comparison point already exists by the time a
+    shipment reaches the alert-eligible threshold below. Being "tracked"
+    does NOT by itself trigger any notification."""
+    days = _ageing_days(val)
+    return days is not None and days >= 1
+
+
+def is_alert_eligible(val):
+    """2_day and above -- only shipments at this ageing level actually
+    trigger a push notification when their item_last_updated changes.
+    1_day shipments are still tracked (see is_tracked) but never alert."""
+    days = _ageing_days(val)
+    return days is not None and days >= 2
 
 
 def send_update_alert(r):
@@ -344,29 +360,30 @@ def purge_old_rows(supabase, table, column="detected_at", days=15):
 
 
 def check_for_updates_and_alert(supabase, records):
-    """For every currently-ageing (1_day+) shipment, compares its
-    item_last_updated against what was seen last run. Alerts when it's
-    the shipment's first time being seen at all (no baseline yet) AND it
-    already has a timestamp, OR when the timestamp has genuinely
-    increased since the last run (something happened in the WMS while
-    the shipment is still ageing)."""
+    """Tracks item_last_updated for every 1_day+ shipment (so a baseline
+    already exists by the time it reaches 2_day), but only ever sends a
+    notification once a shipment is 2_day+ AND its item_last_updated has
+    genuinely changed since the last run. First sighting of any AWB
+    ALWAYS seeds its baseline silently -- never alerts by itself, no
+    matter its ageing bucket -- otherwise every shipment that newly
+    crosses into the tracked range fires an alert storm in one run."""
     if not NTFY_TOPIC and not NTFY_TOPIC_REV:
         print("Neither NTFY_TOPIC nor NTFY_TOPIC_REV is set -- skipping update-detection alerts.")
         return
 
-    ageing_records = [r for r in records if is_ageing_positive(r.get("aging_bucket"))]
-    if not ageing_records:
+    tracked_records = [r for r in records if is_tracked(r.get("aging_bucket"))]
+    if not tracked_records:
         print("No currently-ageing shipments -- nothing to check for updates.")
         return
 
     unique_records = {}
-    for r in ageing_records:
+    for r in tracked_records:
         awb = r["awb_number"]
         if awb not in unique_records or str(r.get("item_last_updated") or "") > str(unique_records[awb].get("item_last_updated") or ""):
             unique_records[awb] = r
-    ageing_records = list(unique_records.values())
+    tracked_records = list(unique_records.values())
 
-    awbs = list({r["awb_number"] for r in ageing_records})
+    awbs = list({r["awb_number"] for r in tracked_records})
     previous = {}
     LOOKUP_CHUNK = 200
     for i in range(0, len(awbs), LOOKUP_CHUNK):
@@ -396,23 +413,24 @@ def check_for_updates_and_alert(supabase, records):
             "last_destination": r.get("last_destination"),
         }).execute()
 
-    for r in ageing_records:
+    for r in tracked_records:
         awb = r["awb_number"]
         current_val = r.get("item_last_updated")
         prev_val = previous.get(awb)
 
         if prev_val is None:
-            # First time this AWB is seen ageing -- alert immediately if it
-            # already has a timestamp (previously this silently seeded the
-            # baseline with no alert; now it alerts too).
-            if current_val:
-                record_alert(r, awb, current_val)
-            else:
-                to_upsert.append({"awb_number": awb, "item_last_updated": current_val})
+            # Always seed silently on first sighting -- never alert here.
+            to_upsert.append({"awb_number": awb, "item_last_updated": current_val})
             continue
 
         if current_val and prev_val and str(current_val) > str(prev_val):
-            record_alert(r, awb, current_val)
+            if is_alert_eligible(r.get("aging_bucket")):
+                record_alert(r, awb, current_val)
+            else:
+                # Genuinely changed, but still only 1_day -- update the
+                # baseline so a repeat check later only alerts on a
+                # further change past this point, without notifying now.
+                to_upsert.append({"awb_number": awb, "item_last_updated": current_val})
 
     if to_upsert:
         for i in range(0, len(to_upsert), CHUNK_SIZE):
@@ -422,7 +440,7 @@ def check_for_updates_and_alert(supabase, records):
 
     purge_old_rows(supabase, "awb_update_alerts")
 
-    print(f"Update-detection: checked {len(ageing_records)} ageing shipments, sent {alerts_sent} alerts.")
+    print(f"Update-detection: checked {len(tracked_records)} tracked shipments, sent {alerts_sent} alerts.")
 
 
 # FWD-only: CLIENT Warehouse and BRSNR are two different categories but the
