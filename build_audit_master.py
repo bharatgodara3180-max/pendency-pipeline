@@ -18,7 +18,7 @@ Known, deliberately-preserved quirks carried over from the original sheet
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import gspread
 import pandas as pd
@@ -34,7 +34,9 @@ AUDIT_SHEET_ID = os.environ.get("AUDIT_SHEET_ID")
 FWD_CSV_PATH = os.environ.get("FWD_CSV_PATH", "fwd_pendency.csv")
 REV_CSV_PATH = os.environ.get("REV_CSV_PATH", "rev_pendency.csv")
 CHUNK_SIZE = 2000  # was 500 -- fewer, larger requests to cut total run time
-NTFY_TOPIC = os.environ.get("NTFY_TOPIC")
+NTFY_TOPIC = os.environ.get("NTFY_TOPIC")           # FWD alerts
+NTFY_TOPIC_REV = os.environ.get("NTFY_TOPIC_REV")    # REV alerts -- separate channel
+NTFY_TOPIC_SKIP = os.environ.get("NTFY_TOPIC_SKIP")  # skipped-stage anomaly alerts -- separate channel
 
 if not all([SUPABASE_URL, SUPABASE_KEY, GOOGLE_SERVICE_ACCOUNT_JSON, AUDIT_SHEET_ID]):
     sys.exit(
@@ -271,11 +273,9 @@ def enrich_dataframe(df, lookups, report_type):
 
 
 def is_ageing_positive(val):
-    """"+1" for these automated features means 2_day and above -- 0_day and
-    1_day are explicitly excluded here. Note this is a DIFFERENT, narrower
-    definition than the scan app's own "Found" check (which flags anything
-    above 0_day) -- that one stays untouched since it's long-established
-    and working."""
+    """"+1" here now means 1_day and above -- previously this required
+    2_day+ (0_day and 1_day excluded); changed so the alert system fires
+    as soon as a shipment crosses into day+1."""
     if not val:
         return False
     s = str(val).strip()
@@ -284,12 +284,20 @@ def is_ageing_positive(val):
     if "+" in s:
         return True
     try:
-        return float(s) >= 2
+        return float(s) >= 1
     except ValueError:
         return False
 
 
-def send_update_alert(topic, r):
+def send_update_alert(r):
+    # FWD and REV go to separate ntfy channels so the two don't mix in one
+    # feed. NTFY_TOPIC is FWD's (kept as-is so the existing secret name
+    # doesn't need to change); NTFY_TOPIC_REV is the new one for REV.
+    topic = NTFY_TOPIC if r.get("report_type") == "FWD" else NTFY_TOPIC_REV
+    if not topic:
+        print(f"  no ntfy topic configured for report_type={r.get('report_type')} -- skipping alert for {r.get('awb_number')}")
+        return
+
     def line(label, key):
         return f"{label}: {r.get(key) or '-'}"
 
@@ -318,19 +326,32 @@ def send_update_alert(topic, r):
             },
             timeout=15,
         )
-        print(f"  ntfy status {resp.status_code} for {r.get('awb_number')}")
+        print(f"  ntfy status {resp.status_code} for {r.get('awb_number')} (topic={topic})")
     except Exception as e:
         print(f"  failed to send ntfy alert for {r.get('awb_number')}: {e}")
 
 
+def purge_old_rows(supabase, table, column="detected_at", days=15):
+    """Both awb_update_alerts and awb_stage_skip_alerts are append-only
+    logs -- without this they grow forever. Keeps only the last `days`
+    days of rows."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    try:
+        supabase.table(table).delete().lt(column, cutoff).execute()
+        print(f"Purged {table} rows older than {cutoff}.")
+    except Exception as e:
+        print(f"  failed to purge old {table} rows: {e}")
+
+
 def check_for_updates_and_alert(supabase, records):
-    """For every currently-ageing shipment, compares its item_last_updated
-    against what was seen last run. Alerts only when it genuinely increased
-    (something happened in the WMS) -- never on every pipeline cycle, and
-    never on the very first time an AWB is seen (that just seeds the
-    baseline silently, to avoid an alert-storm on first deployment)."""
-    if not NTFY_TOPIC:
-        print("NTFY_TOPIC not set -- skipping update-detection alerts.")
+    """For every currently-ageing (1_day+) shipment, compares its
+    item_last_updated against what was seen last run. Alerts when it's
+    the shipment's first time being seen at all (no baseline yet) AND it
+    already has a timestamp, OR when the timestamp has genuinely
+    increased since the last run (something happened in the WMS while
+    the shipment is still ageing)."""
+    if not NTFY_TOPIC and not NTFY_TOPIC_REV:
+        print("Neither NTFY_TOPIC nor NTFY_TOPIC_REV is set -- skipping update-detection alerts.")
         return
 
     ageing_records = [r for r in records if is_ageing_positive(r.get("aging_bucket"))]
@@ -361,26 +382,37 @@ def check_for_updates_and_alert(supabase, records):
 
     to_upsert = []
     alerts_sent = 0
+
+    def record_alert(r, awb, current_val):
+        nonlocal alerts_sent
+        send_update_alert(r)
+        alerts_sent += 1
+        to_upsert.append({"awb_number": awb, "item_last_updated": current_val})
+        supabase.table("awb_update_alerts").insert({
+            "awb_number": awb,
+            "aging_bucket": r.get("aging_bucket"),
+            "pendency_type": r.get("pendency_type"),
+            "report_type": r.get("report_type"),
+            "last_destination": r.get("last_destination"),
+        }).execute()
+
     for r in ageing_records:
         awb = r["awb_number"]
         current_val = r.get("item_last_updated")
         prev_val = previous.get(awb)
 
         if prev_val is None:
-            to_upsert.append({"awb_number": awb, "item_last_updated": current_val})
+            # First time this AWB is seen ageing -- alert immediately if it
+            # already has a timestamp (previously this silently seeded the
+            # baseline with no alert; now it alerts too).
+            if current_val:
+                record_alert(r, awb, current_val)
+            else:
+                to_upsert.append({"awb_number": awb, "item_last_updated": current_val})
             continue
 
         if current_val and prev_val and str(current_val) > str(prev_val):
-            send_update_alert(NTFY_TOPIC, r)
-            alerts_sent += 1
-            to_upsert.append({"awb_number": awb, "item_last_updated": current_val})
-            supabase.table("awb_update_alerts").insert({
-                "awb_number": awb,
-                "aging_bucket": r.get("aging_bucket"),
-                "pendency_type": r.get("pendency_type"),
-                "report_type": r.get("report_type"),
-                "last_destination": r.get("last_destination"),
-            }).execute()
+            record_alert(r, awb, current_val)
 
     if to_upsert:
         for i in range(0, len(to_upsert), CHUNK_SIZE):
@@ -388,7 +420,152 @@ def check_for_updates_and_alert(supabase, records):
                 to_upsert[i:i + CHUNK_SIZE], on_conflict="awb_number"
             ).execute()
 
+    purge_old_rows(supabase, "awb_update_alerts")
+
     print(f"Update-detection: checked {len(ageing_records)} ageing shipments, sent {alerts_sent} alerts.")
+
+
+# FWD-only: CLIENT Warehouse and BRSNR are two different categories but the
+# same physical step ("PFC"); Received at DC is "RDC" (bin distinguished by
+# bin_level); At Dock is the final step before a shipment clears out of
+# pendency entirely. REV doesn't follow this flow, so stage-tracking is
+# scoped to report_type == "FWD" only.
+FWD_PFC_TYPES = {"CLIENT Warehouse", "BRSNR"}
+
+
+def get_stage_key(pendency_type, bin_level):
+    """Returns (stage_label, stage_key) for the PFC -> RDC (bin) -> At Dock
+    flow. stage_key is what's actually compared run-to-run; stage_label is
+    just for the alert text. bin_level is only meaningful (and only
+    checked) at the RDC stage -- whatever its real values are, a change in
+    bin_level while still at RDC is picked up as a bin1->bin2 style move
+    without needing to know those values in advance. Categories outside
+    this flow return (None, None) and are skipped entirely."""
+    pt = (pendency_type or "").strip()
+    if pt in FWD_PFC_TYPES:
+        return "PFC", "PFC"
+    if pt == "Received at DC":
+        bl = (bin_level or "").strip() or "(no bin)"
+        return f"RDC bin {bl}", f"RDC:{bl}"
+    if pt == "At Dock":
+        return "At Dock", "AT_DOCK"
+    return None, None
+
+
+def send_stage_alert(topic, title, message):
+    if not topic:
+        return
+    try:
+        resp = requests.post(
+            f"https://ntfy.sh/{topic}",
+            data=message.encode("utf-8"),
+            headers={"Title": title, "Priority": "high", "Tags": "package"},
+            timeout=15,
+        )
+        print(f"  ntfy status {resp.status_code} ({title}, topic={topic})")
+    except Exception as e:
+        print(f"  failed to send ntfy stage alert: {e}")
+
+
+def check_stage_transitions_and_alert(supabase, records):
+    """Tracks each FWD shipment's PFC -> RDC (bin) -> At Dock movement
+    across pipeline runs and alerts on every stage change:
+      PFC -> RDC bin X            (received at DC)
+      RDC bin X -> RDC bin Y      (moved bins, e.g. waiting for seal number)
+      RDC bin X -> At Dock        (sealed into a bag)
+    If a shipment disappears from the FWD data entirely (cleared from
+    pendency) while its last known stage was At Dock, that's the normal,
+    expected end of the flow -- no alert. If it disappears from ANY other
+    stage (PFC or RDC, never having shown up at At Dock), that's an
+    anomaly -- skipped straight to cleared -- and goes to its own separate
+    ntfy channel + its own table instead of the normal alert stream."""
+    if not (NTFY_TOPIC or NTFY_TOPIC_REV or NTFY_TOPIC_SKIP):
+        print("No ntfy topics configured -- skipping stage-transition tracking.")
+        return
+
+    current_by_awb = {}
+    for r in records:
+        if r.get("report_type") != "FWD":
+            continue
+        label, key = get_stage_key(r.get("pendency_type"), r.get("bin_level"))
+        if key is None:
+            continue
+        current_by_awb[r["awb_number"]] = (label, key, r)
+
+    previous = {}
+    PAGE = 1000
+    start = 0
+    while True:
+        resp = (
+            supabase.table("awb_stage_last_seen")
+            .select("awb_number, stage_key, stage_label")
+            .range(start, start + PAGE - 1)
+            .execute()
+        )
+        for row in resp.data:
+            previous[row["awb_number"]] = (row["stage_label"], row["stage_key"])
+        if len(resp.data) < PAGE:
+            break
+        start += PAGE
+
+    to_upsert = []
+    to_delete = []
+    transition_alerts = 0
+    skip_alerts = 0
+
+    for awb, (label, key, r) in current_by_awb.items():
+        prev = previous.pop(awb, None)
+        if prev is None:
+            # First time this AWB is seen in the flow -- start tracking,
+            # nothing to alert on yet (no previous stage to move FROM).
+            to_upsert.append({"awb_number": awb, "stage_key": key, "stage_label": label})
+            continue
+
+        prev_label, prev_key = prev
+        if prev_key != key:
+            message = "\n".join([
+                f"AWB: {awb}",
+                f"Moved: {prev_label} -> {label}",
+                f"Seal Number: {r.get('seal_number') or '-'}",
+                f"Client: {r.get('client_name') or '-'}",
+                f"Layout: {r.get('layout_name') or '-'}",
+            ])
+            send_stage_alert(NTFY_TOPIC, f"Stage moved: {awb}", message)
+            transition_alerts += 1
+        to_upsert.append({"awb_number": awb, "stage_key": key, "stage_label": label})
+
+    # Anything still left in `previous` was tracked last run but isn't in
+    # this run's FWD data at all -- it has left the flow entirely.
+    for awb, (prev_label, prev_key) in previous.items():
+        to_delete.append(awb)
+        if prev_key != "AT_DOCK":
+            message = "\n".join([
+                f"AWB: {awb}",
+                f"Last seen at: {prev_label}",
+                "Cleared from pendency WITHOUT passing through At Dock first.",
+            ])
+            send_stage_alert(NTFY_TOPIC_SKIP, f"Skipped stage: {awb}", message)
+            supabase.table("awb_stage_skip_alerts").insert({
+                "awb_number": awb,
+                "last_seen_stage": prev_label,
+            }).execute()
+            skip_alerts += 1
+
+    if to_upsert:
+        for i in range(0, len(to_upsert), CHUNK_SIZE):
+            supabase.table("awb_stage_last_seen").upsert(
+                to_upsert[i:i + CHUNK_SIZE], on_conflict="awb_number"
+            ).execute()
+
+    if to_delete:
+        for i in range(0, len(to_delete), 200):
+            supabase.table("awb_stage_last_seen").delete().in_(
+                "awb_number", to_delete[i:i + 200]
+            ).execute()
+
+    purge_old_rows(supabase, "awb_stage_skip_alerts")
+
+    print(f"Stage-tracking: {transition_alerts} stage-change alerts, {skip_alerts} skip alerts.")
 
 
 def main():
@@ -442,6 +619,9 @@ def main():
 
     print("\nChecking for shipment updates...")
     check_for_updates_and_alert(supabase, records)
+
+    print("\nChecking for stage transitions (PFC -> RDC -> At Dock)...")
+    check_stage_transitions_and_alert(supabase, records)
 
     print("Done.")
 
