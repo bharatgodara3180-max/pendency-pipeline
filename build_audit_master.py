@@ -187,11 +187,16 @@ def enrich_rdcpfc_style(row, lookups):
 
 
 def enrich_at_dockbrsnr_style(row, lookups):
-    manifest_dest = row.get("manifest_destination_name") or ""
-    manifest_prev = row.get("manifest_previous_location_name") or ""
+    # Lookup order fixed: item_destination_name first (the shipment's own
+    # declared destination), THEN next_location as a fallback if that's
+    # blank/unmatched, THEN the NCR_Bilaspur_DC default -- previously this
+    # checked manifest_destination_name/manifest_previous_location_name,
+    # which was giving wrong last_destination values.
+    item_dest = row.get("item_destination_name") or ""
+    next_loc = row.get("next_location") or ""
     primary_bin = (
-        lookups["stagging_c_to_d"].get(manifest_dest)
-        or lookups["stagging_c_to_d"].get(manifest_prev)
+        lookups["stagging_c_to_d"].get(item_dest)
+        or lookups["stagging_c_to_d"].get(next_loc)
         or lookups["stagging_c_to_d"].get("NCR_Bilaspur_DC", "")
     )
     secondary_bin = lookups["stagging_d_to_c"].get(primary_bin, "")
