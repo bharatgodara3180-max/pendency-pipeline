@@ -218,6 +218,26 @@ def enrich_rev_style(row, is_at_dockbrsnr_variant):
     return "CFGR", secondary, last_destination
 
 
+def normalize_aging_bucket(val):
+    """The raw WMS export doesn't stop counting at 6 days -- it keeps
+    going day by day (7_day, 8_day, 9_day, 10_day, 10+_day, ...), but the
+    Live Pendency dashboard only has columns through "6+_day". Anything
+    past 6_day gets collapsed into that one bucket -- same normalization
+    as upload_to_supabase.py, kept in sync so audit_master's aging_bucket
+    matches what the pendency summary shows."""
+    if not val:
+        return val
+    s = str(val).strip()
+    core = s[:-4] if s.lower().endswith("_day") else s
+    if "+" in core:
+        return "6+_day"
+    try:
+        days = float(core)
+    except ValueError:
+        return val
+    return "6+_day" if days > 6 else s
+
+
 def enrich_dataframe(df, lookups, report_type):
     records = []
     for _, row in df.iterrows():
@@ -247,7 +267,7 @@ def enrich_dataframe(df, lookups, report_type):
             "awb_number": awb,
             "manifest_code": row.get("manifest_code"),
             "seal_number": row.get("seal_number"),
-            "aging_bucket": row.get("aging_bucket"),
+            "aging_bucket": normalize_aging_bucket(row.get("aging_bucket")),
             "action_user": action_user,
             "bin_level": row.get("bin_level"),
             "bin_name": row.get("bin_name"),
