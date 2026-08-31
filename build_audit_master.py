@@ -36,7 +36,6 @@ REV_CSV_PATH = os.environ.get("REV_CSV_PATH", "rev_pendency.csv")
 CHUNK_SIZE = 2000  # was 500 -- fewer, larger requests to cut total run time
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC")           # FWD alerts
 NTFY_TOPIC_REV = os.environ.get("NTFY_TOPIC_REV")    # REV alerts -- separate channel
-NTFY_TOPIC_SKIP = os.environ.get("NTFY_TOPIC_SKIP")  # skipped-stage anomaly alerts -- separate channel
 
 if not all([SUPABASE_URL, SUPABASE_KEY, GOOGLE_SERVICE_ACCOUNT_JSON, AUDIT_SHEET_ID]):
     sys.exit(
@@ -350,9 +349,8 @@ def send_update_alert(r):
 
 
 def purge_old_rows(supabase, table, column="detected_at", days=15):
-    """Both awb_update_alerts and awb_stage_skip_alerts are append-only
-    logs -- without this they grow forever. Keeps only the last `days`
-    days of rows."""
+    """awb_update_alerts is an append-only log -- without this it grows
+    forever. Keeps only the last `days` days of rows."""
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     try:
         supabase.table(table).delete().lt(column, cutoff).execute()
@@ -456,11 +454,11 @@ FWD_PFC_TYPES = {"CLIENT Warehouse", "BRSNR"}
 def get_stage_key(pendency_type, bin_level):
     """Returns (stage_label, stage_key) for the PFC -> RDC (bin) -> At Dock
     flow. stage_key is what's actually compared run-to-run; stage_label is
-    just for the alert text. bin_level is only meaningful (and only
-    checked) at the RDC stage -- whatever its real values are, a change in
-    bin_level while still at RDC is picked up as a bin1->bin2 style move
-    without needing to know those values in advance. Categories outside
-    this flow return (None, None) and are skipped entirely."""
+    just for messages. bin_level is only meaningful (and only checked) at
+    the RDC stage -- whatever its real values are, a change in bin_level
+    while still at RDC is picked up as a bin1->bin2 style move without
+    needing to know those values in advance. Categories outside this flow
+    return (None, None) and are skipped entirely."""
     pt = (pendency_type or "").strip()
     if pt in FWD_PFC_TYPES:
         return "PFC", "PFC"
@@ -472,34 +470,12 @@ def get_stage_key(pendency_type, bin_level):
     return None, None
 
 
-def send_stage_alert(topic, title, message):
-    if not topic:
-        return
-    try:
-        resp = requests.post(
-            f"https://ntfy.sh/{topic}",
-            data=message.encode("utf-8"),
-            headers={"Title": title, "Priority": "high", "Tags": "package"},
-            timeout=15,
-        )
-        print(f"  ntfy status {resp.status_code} ({title}, topic={topic})")
-    except Exception as e:
-        print(f"  failed to send ntfy stage alert: {e}")
-
-
 def check_stage_transitions_and_alert(supabase, records):
     """Tracks each FWD shipment's PFC -> RDC (bin) -> At Dock movement
-    across pipeline runs, silently -- normal stage-to-stage movement does
-    NOT send any notification. The only thing this actually alerts on is
-    a shipment disappearing from the FWD data (cleared from pendency)
-    while its last known stage was PFC or RDC -- i.e. it never showed up
-    "At Dock" first. That's an anomaly, and goes to its own separate ntfy
-    channel (NTFY_TOPIC_SKIP) + its own table. Disappearing while at
-    At Dock is the normal, expected end of the flow -- no alert either
-    way."""
-    if not NTFY_TOPIC_SKIP:
-        print("NTFY_TOPIC_SKIP not set -- stage tracking will still run (needed for skip-detection state) but no skip alerts can be sent.")
-
+    across pipeline runs, purely for state-keeping -- no alert of any kind
+    is sent from here anymore. Normal stage-to-stage movement AND a
+    shipment disappearing from the data (whatever stage it was last at)
+    are both handled silently."""
     current_by_awb = {}
     for r in records:
         if r.get("report_type") != "FWD":
@@ -527,41 +503,16 @@ def check_stage_transitions_and_alert(supabase, records):
 
     to_upsert = []
     to_delete = []
-    skip_alerts = 0
 
     for awb, (label, key, r) in current_by_awb.items():
-        prev = previous.pop(awb, None)
-        if prev is None:
-            # First time this AWB is seen in the flow -- start tracking,
-            # nothing to alert on yet (no previous stage to move FROM).
-            to_upsert.append({"awb_number": awb, "stage_key": key, "stage_label": label})
-            continue
-
-        prev_label, prev_key = prev
-        # Normal stage-to-stage movement (PFC -> RDC, RDC bin X -> bin Y,
-        # RDC -> At Dock) is tracked silently -- no notification for these
-        # anymore. Only the skip-detection below (stage disappearing
-        # without reaching At Dock) actually alerts.
+        previous.pop(awb, None)
         to_upsert.append({"awb_number": awb, "stage_key": key, "stage_label": label})
 
     # Anything still left in `previous` was tracked last run but isn't in
-    # this run's FWD data at all -- it has left the flow entirely.
-    for awb, (prev_label, prev_key) in previous.items():
+    # this run's FWD data at all -- it has left the flow entirely. No
+    # alert, no log -- just stop tracking it.
+    for awb in previous.keys():
         to_delete.append(awb)
-        if prev_key != "AT_DOCK":
-            # PFC or RDC -> gone, without ever reaching At Dock first.
-            message = "\n".join([
-                f"AWB: {awb}",
-                f"Last seen at: {prev_label}",
-                "Cleared from pendency WITHOUT passing through At Dock first.",
-            ])
-            send_stage_alert(NTFY_TOPIC_SKIP, f"Skipped stage: {awb}", message)
-            supabase.table("awb_stage_skip_alerts").insert({
-                "awb_number": awb,
-                "last_seen_stage": prev_label,
-            }).execute()
-            skip_alerts += 1
-        # prev_key == "AT_DOCK" -> normal, expected clearance. No alert.
 
     if to_upsert:
         for i in range(0, len(to_upsert), CHUNK_SIZE):
@@ -575,9 +526,7 @@ def check_stage_transitions_and_alert(supabase, records):
                 "awb_number", to_delete[i:i + 200]
             ).execute()
 
-    purge_old_rows(supabase, "awb_stage_skip_alerts")
-
-    print(f"Stage-tracking: {skip_alerts} skip alerts (normal stage moves are tracked silently, no notification).")
+    print(f"Stage-tracking: {len(to_upsert)} shipments tracked, {len(to_delete)} left the flow (no alerts sent).")
 
 
 def main():
