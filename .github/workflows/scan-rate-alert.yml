@@ -1,9 +1,6 @@
 name: Scan Rate Alerts
 on:
-  workflow_dispatch:
-  schedule:
-    - cron: '15,45 * * * *'
-      timezone: 'Asia/Kolkata'   # :45 = this hour's half-hour slot, :15 = previous full hour
+  workflow_dispatch:  # triggered externally (cron-job.org) at :15 and :45 past the hour
 jobs:
   send-scan-rate-alerts:
     runs-on: ubuntu-latest
