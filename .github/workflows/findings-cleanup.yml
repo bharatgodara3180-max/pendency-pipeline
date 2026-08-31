@@ -1,0 +1,21 @@
+name: Findings Cleanup
+on:
+  workflow_dispatch:  # triggered externally (cron-job.org) at 09:00 and 21:00 IST
+jobs:
+  cleanup-findings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install supabase
+      - name: Run findings cleanup
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: python findings_cleanup.py
