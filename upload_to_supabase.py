@@ -55,6 +55,25 @@ REV_COLUMNS = [
 CHUNK_SIZE = 2000  # was 500 -- fewer, larger requests to cut total run time
 
 
+def normalize_aging_bucket(val):
+    """The raw WMS export doesn't stop counting at 6 days -- it keeps
+    going day by day (7_day, 8_day, 9_day, 10_day, 10+_day, ...), but the
+    dashboard only has columns up through "6+_day". Anything past 6_day
+    gets collapsed into that one bucket so it's actually counted instead
+    of silently falling outside every known column."""
+    if not val or pd.isna(val):
+        return val
+    s = str(val).strip()
+    core = s[:-4] if s.lower().endswith("_day") else s
+    if "+" in core:
+        return "6+_day"
+    try:
+        days = float(core)
+    except ValueError:
+        return val
+    return "6+_day" if days > 6 else s
+
+
 def load_csv(path, columns, label):
     if not os.path.exists(path):
         sys.exit(f"Can't find the {label} file at: {path}\nCheck the path / filename.")
@@ -68,6 +87,8 @@ def load_csv(path, columns, label):
     df = df[columns].copy()
     if "doh_flag" in df.columns:
         df["doh_flag"] = df["doh_flag"].map({"True": True, "False": False})
+    if "aging_bucket" in df.columns:
+        df["aging_bucket"] = df["aging_bucket"].map(normalize_aging_bucket)
     return df
 
 
