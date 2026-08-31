@@ -492,10 +492,15 @@ def get_stage_key(pendency_type, bin_level):
 
 def check_stage_transitions_and_alert(supabase, records):
     """Tracks each FWD shipment's PFC -> RDC (bin) -> At Dock movement
-    across pipeline runs, purely for state-keeping -- no alert of any kind
-    is sent from here anymore. Normal stage-to-stage movement AND a
-    shipment disappearing from the data (whatever stage it was last at)
-    are both handled silently."""
+    across pipeline runs, purely for state-keeping -- no ntfy alert of any
+    kind is sent from here. Two specific transitions are logged as
+    scan-throughput events instead (awb_scan_events), credited to
+    whoever's action_user is on the shipment's NEW (post-move) row:
+      Primary   = CLIENT Warehouse -> Received at DC (RDC, any bin)
+      Secondary = Received at DC (RDC, any bin) -> At Dock
+    BRSNR -> RDC is NOT counted as Primary -- only CLIENT Warehouse is.
+    A shipment disappearing from the data (whatever stage it was last at)
+    is handled silently either way -- no alert, no skip-log."""
     current_by_awb = {}
     for r in records:
         if r.get("report_type") != "FWD":
@@ -511,28 +516,52 @@ def check_stage_transitions_and_alert(supabase, records):
     while True:
         resp = (
             supabase.table("awb_stage_last_seen")
-            .select("awb_number, stage_key, stage_label")
+            .select("awb_number, stage_key, stage_label, pendency_type")
             .range(start, start + PAGE - 1)
             .execute()
         )
         for row in resp.data:
-            previous[row["awb_number"]] = (row["stage_label"], row["stage_key"])
+            previous[row["awb_number"]] = (row["stage_label"], row["stage_key"], row.get("pendency_type"))
         if len(resp.data) < PAGE:
             break
         start += PAGE
 
     to_upsert = []
     to_delete = []
+    scan_events = []
 
     for awb, (label, key, r) in current_by_awb.items():
-        previous.pop(awb, None)
-        to_upsert.append({"awb_number": awb, "stage_key": key, "stage_label": label})
+        pendency_type = r.get("pendency_type")
+        prev = previous.pop(awb, None)
+        if prev is not None:
+            prev_label, prev_key, prev_pendency_type = prev
+            if prev_pendency_type == "CLIENT Warehouse" and key.startswith("RDC:"):
+                scan_events.append({
+                    "awb_number": awb, "scan_type": "primary",
+                    "action_user": r.get("action_user"), "emp_name": r.get("emp_name"),
+                    "client_name": r.get("client_name"), "layout_name": r.get("layout_name"),
+                    "blocks": r.get("blocks"),
+                    "occurred_at": r.get("item_last_updated"),
+                })
+            elif prev_key is not None and prev_key.startswith("RDC:") and key == "AT_DOCK":
+                scan_events.append({
+                    "awb_number": awb, "scan_type": "secondary",
+                    "action_user": r.get("action_user"), "emp_name": r.get("emp_name"),
+                    "client_name": r.get("client_name"), "layout_name": r.get("layout_name"),
+                    "blocks": r.get("blocks"),
+                    "occurred_at": r.get("item_last_updated"),
+                })
+        to_upsert.append({"awb_number": awb, "stage_key": key, "stage_label": label, "pendency_type": pendency_type})
 
     # Anything still left in `previous` was tracked last run but isn't in
     # this run's FWD data at all -- it has left the flow entirely. No
     # alert, no log -- just stop tracking it.
     for awb in previous.keys():
         to_delete.append(awb)
+
+    if scan_events:
+        for i in range(0, len(scan_events), CHUNK_SIZE):
+            supabase.table("awb_scan_events").insert(scan_events[i:i + CHUNK_SIZE]).execute()
 
     if to_upsert:
         for i in range(0, len(to_upsert), CHUNK_SIZE):
@@ -546,7 +575,9 @@ def check_stage_transitions_and_alert(supabase, records):
                 "awb_number", to_delete[i:i + 200]
             ).execute()
 
-    print(f"Stage-tracking: {len(to_upsert)} shipments tracked, {len(to_delete)} left the flow (no alerts sent).")
+    purge_old_rows(supabase, "awb_scan_events", column="occurred_at")
+
+    print(f"Stage-tracking: {len(to_upsert)} shipments tracked, {len(to_delete)} left the flow, {len(scan_events)} scan-throughput events logged.")
 
 
 def main():
