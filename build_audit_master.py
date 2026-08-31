@@ -335,6 +335,22 @@ def is_tracked(val):
     return days is not None and days >= 1
 
 
+def _parse_dt(val):
+    """Parses a timestamp value regardless of exact string shape -- what
+    we write is "YYYY-MM-DD HH:MM:SS" (space), but PostgREST reads a
+    plain `timestamp` column back out as "YYYY-MM-DDTHH:MM:SS" (T). A raw
+    string comparison between those two shapes is unreliable (a space
+    character sorts before 'T', so it could compare wrong regardless of
+    the actual times), so every comparison must go through this parser
+    instead of str(a) > str(b)."""
+    if not val:
+        return None
+    try:
+        return dateutil_parser.parse(str(val).strip())
+    except (ValueError, OverflowError):
+        return None
+
+
 def is_alert_eligible(val):
     """2_day and above -- only shipments at this ageing level actually
     trigger a push notification when their item_last_updated changes.
@@ -475,7 +491,7 @@ def check_for_updates_and_alert(supabase, records):
             to_upsert.append({"awb_number": awb, "item_last_updated": current_val})
             continue
 
-        if current_val and prev_val and str(current_val) > str(prev_val):
+        if current_val and prev_val and _parse_dt(current_val) and _parse_dt(prev_val) and _parse_dt(current_val) > _parse_dt(prev_val):
             if is_alert_eligible(r.get("aging_bucket")):
                 record_alert(r, awb, current_val)
             else:
