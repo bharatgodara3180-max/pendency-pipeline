@@ -50,12 +50,14 @@ def load_font(bold=False, size=15):
 
 
 def determine_window():
-    """Returns (window_start_utc, window_end_utc, slot_label, is_full_hour).
-    Robust to the workflow firing a couple of minutes late: anything in
-    the first half of the hour (0-29 min) is treated as the ":15" full-hour
-    trigger, anything in the second half (30-59 min) as the ":45"
-    half-hour trigger."""
-    now_ist = datetime.now(IST)
+    """Returns (window_start, window_end, slot_label, is_full_hour) as
+    naive IST wall-clock datetimes -- occurred_at is stored as plain IST
+    (no timezone), so the query bounds must match that exactly, with no
+    UTC conversion. Robust to the workflow firing a couple of minutes
+    late: anything in the first half of the hour (0-29 min) is treated as
+    the ":15" full-hour trigger, anything in the second half (30-59 min)
+    as the ":45" half-hour trigger."""
+    now_ist = datetime.now(IST).replace(tzinfo=None)
     minute = now_ist.minute
 
     if minute < 30:
@@ -69,7 +71,7 @@ def determine_window():
         is_full_hour = False
 
     slot_label = f"{window_start.strftime('%d-%m-%Y')} {window_start.strftime('%H:%M')}-{window_end.strftime('%H:%M')}"
-    return window_start.astimezone(timezone.utc), window_end.astimezone(timezone.utc), slot_label, is_full_hour
+    return window_start, window_end, slot_label, is_full_hour
 
 
 def fetch_events(supabase, scan_type, block, window_start, window_end):
@@ -82,8 +84,8 @@ def fetch_events(supabase, scan_type, block, window_start, window_end):
             .select("awb_number, layout_name, action_user")
             .eq("scan_type", scan_type)
             .eq("blocks", block)
-            .gte("occurred_at", window_start.isoformat())
-            .lt("occurred_at", window_end.isoformat())
+            .gte("occurred_at", window_start.strftime("%Y-%m-%d %H:%M:%S"))
+            .lt("occurred_at", window_end.strftime("%Y-%m-%d %H:%M:%S"))
             .range(start, start + PAGE - 1)
             .execute()
         )
