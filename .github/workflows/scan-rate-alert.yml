@@ -1,0 +1,25 @@
+name: Scan Rate Alerts
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15,45 * * * *'
+      timezone: 'Asia/Kolkata'   # :45 = this hour's half-hour slot, :15 = previous full hour
+jobs:
+  send-scan-rate-alerts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install supabase requests Pillow
+      - name: Send scan rate alerts
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python scan_rate_alert.py
