@@ -238,27 +238,21 @@ def normalize_aging_bucket(val):
     return "6+_day" if days > 6 else s
 
 
-IST = timezone(timedelta(hours=5, minutes=30))
-
-
-def to_utc_iso(raw):
-    """item_last_updated from the WMS export is plain IST wall-clock time
-    with no timezone marker (e.g. "2026-08-31 11:07:02"). Postgres has no
-    way to know that and stores it as if it were UTC -- every timestamp
-    ends up shifted 5:30 early (11:07 IST gets stored as if it happened at
-    11:07 UTC, i.e. 16:37 IST). This attaches the correct IST offset and
-    converts to the true UTC instant before it's written anywhere, so
-    every consumer (scan-rate windows, "Last Scanned" display, the
-    2_day+ update-alert comparison) is working with a real instant."""
+def normalize_timestamp(raw):
+    """Keeps item_last_updated as plain IST wall-clock time -- exactly what
+    the WMS portal shows, no UTC conversion at all. Every timestamp column
+    that stores this (audit_master.item_last_updated, awb_last_seen,
+    awb_scan_events.occurred_at) must be a plain `timestamp` column
+    (NOT `timestamptz`), otherwise Postgres/Supabase Studio will display
+    it in UTC regardless of what's written here. This only re-formats the
+    raw CSV value into one consistent string shape."""
     if raw is None or (isinstance(raw, float) and pd.isna(raw)):
         return None
     try:
         dt = dateutil_parser.parse(str(raw).strip())
     except (ValueError, OverflowError):
         return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=IST)
-    return dt.astimezone(timezone.utc).isoformat()
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 
 def enrich_dataframe(df, lookups, report_type):
@@ -284,7 +278,7 @@ def enrich_dataframe(df, lookups, report_type):
         action_user = row.get("action_user") or ""
         item_last_updated_raw = row.get("item_last_updated")
         has_timestamp = item_last_updated_raw is not None and pd.notna(item_last_updated_raw)
-        item_last_updated = to_utc_iso(item_last_updated_raw) if has_timestamp else None
+        item_last_updated = normalize_timestamp(item_last_updated_raw) if has_timestamp else None
         pendency_type = str(category).replace("NOT IN BAG / ", "").replace("IN BAG / ", "")
 
         records.append({
@@ -456,6 +450,20 @@ def check_for_updates_and_alert(supabase, records):
             "report_type": r.get("report_type"),
             "last_destination": r.get("last_destination"),
         }).execute()
+        # Findings Status tracking -- one active row per AWB, capturing the
+        # stage it was AT WHEN ALERTED so findings_cleanup.py can later
+        # tell whether it has since progressed (closed) or not (open).
+        # upsert (not insert) so a re-alert on the same AWB just refreshes
+        # this row instead of erroring on a duplicate key.
+        supabase.table("active_findings").upsert({
+            "awb_number": awb,
+            "report_type": r.get("report_type"),
+            "pendency_type": r.get("pendency_type"),
+            "blocks": r.get("blocks"),
+            "aging_bucket": r.get("aging_bucket"),
+            "seal_number": r.get("seal_number"),
+            "last_destination": r.get("last_destination"),
+        }, on_conflict="awb_number").execute()
 
     for r in tracked_records:
         awb = r["awb_number"]
@@ -553,10 +561,33 @@ def check_stage_transitions_and_alert(supabase, records):
     to_upsert = []
     to_delete = []
     scan_events = []
+    pfc_first_seen_rows = []   # Sheet 1: first-seen time at PFC (CLIENT Warehouse/BRSNR), for EVERY shipment
+    rdc_last_seen_rows = []    # Sheet 2: latest-seen time at RDC, for EVERY shipment currently at RDC
+    rdc_to_clear = []          # AWBs that left RDC (moved on or gone) -- remove their rdc_last_seen row
 
     for awb, (label, key, r) in current_by_awb.items():
         pendency_type = r.get("pendency_type")
         prev = previous.pop(awb, None)
+
+        if key == "PFC":
+            # Insert-only -- never overwritten, so this always holds the
+            # FIRST time this AWB was ever seen at PFC, regardless of how
+            # many pipeline runs it's been sitting there since.
+            pfc_first_seen_rows.append({
+                "awb_number": awb, "first_seen_at": r.get("item_last_updated"), "pendency_type": pendency_type
+            })
+        elif key.startswith("RDC:"):
+            # Always overwritten with the latest -- this is "where was it
+            # last seen at RDC", used to check against once it reaches
+            # At Dock (Secondary).
+            rdc_last_seen_rows.append({
+                "awb_number": awb, "rdc_time": r.get("item_last_updated"), "bin_level": r.get("bin_level")
+            })
+        elif prev is not None and prev[1] is not None and prev[1].startswith("RDC:"):
+            # Was at RDC last run, isn't anymore (moved on or gone) --
+            # this sheet should only ever list shipments CURRENTLY at RDC.
+            rdc_to_clear.append(awb)
+
         if prev is not None:
             prev_label, prev_key, prev_pendency_type = prev
             if prev_pendency_type == "CLIENT Warehouse" and key.startswith("RDC:"):
@@ -579,13 +610,33 @@ def check_stage_transitions_and_alert(supabase, records):
 
     # Anything still left in `previous` was tracked last run but isn't in
     # this run's FWD data at all -- it has left the flow entirely. No
-    # alert, no log -- just stop tracking it.
-    for awb in previous.keys():
+    # alert, no log -- just stop tracking it. If it was sitting at RDC,
+    # clear its rdc_last_seen row too (Sheet 2 only lists AWBs currently
+    # at RDC).
+    for awb, prev_val in previous.items():
         to_delete.append(awb)
+        if prev_val[1] is not None and prev_val[1].startswith("RDC:"):
+            rdc_to_clear.append(awb)
 
     if scan_events:
         for i in range(0, len(scan_events), CHUNK_SIZE):
             supabase.table("awb_scan_events").insert(scan_events[i:i + CHUNK_SIZE]).execute()
+
+    if pfc_first_seen_rows:
+        for i in range(0, len(pfc_first_seen_rows), CHUNK_SIZE):
+            supabase.table("pfc_first_seen").upsert(
+                pfc_first_seen_rows[i:i + CHUNK_SIZE], on_conflict="awb_number", ignore_duplicates=True
+            ).execute()
+
+    if rdc_last_seen_rows:
+        for i in range(0, len(rdc_last_seen_rows), CHUNK_SIZE):
+            supabase.table("rdc_last_seen").upsert(
+                rdc_last_seen_rows[i:i + CHUNK_SIZE], on_conflict="awb_number"
+            ).execute()
+
+    if rdc_to_clear:
+        for i in range(0, len(rdc_to_clear), 200):
+            supabase.table("rdc_last_seen").delete().in_("awb_number", rdc_to_clear[i:i + 200]).execute()
 
     if to_upsert:
         for i in range(0, len(to_upsert), CHUNK_SIZE):
