@@ -238,6 +238,29 @@ def normalize_aging_bucket(val):
     return "6+_day" if days > 6 else s
 
 
+IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def to_utc_iso(raw):
+    """item_last_updated from the WMS export is plain IST wall-clock time
+    with no timezone marker (e.g. "2026-08-31 11:07:02"). Postgres has no
+    way to know that and stores it as if it were UTC -- every timestamp
+    ends up shifted 5:30 early (11:07 IST gets stored as if it happened at
+    11:07 UTC, i.e. 16:37 IST). This attaches the correct IST offset and
+    converts to the true UTC instant before it's written anywhere, so
+    every consumer (scan-rate windows, "Last Scanned" display, the
+    2_day+ update-alert comparison) is working with a real instant."""
+    if raw is None or (isinstance(raw, float) and pd.isna(raw)):
+        return None
+    try:
+        dt = dateutil_parser.parse(str(raw).strip())
+    except (ValueError, OverflowError):
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=IST)
+    return dt.astimezone(timezone.utc).isoformat()
+
+
 def enrich_dataframe(df, lookups, report_type):
     records = []
     for _, row in df.iterrows():
@@ -259,8 +282,9 @@ def enrich_dataframe(df, lookups, report_type):
             primary_bin, secondary_bin, last_destination = "", "", ""
 
         action_user = row.get("action_user") or ""
-        item_last_updated = row.get("item_last_updated")
-        has_timestamp = item_last_updated is not None and pd.notna(item_last_updated)
+        item_last_updated_raw = row.get("item_last_updated")
+        has_timestamp = item_last_updated_raw is not None and pd.notna(item_last_updated_raw)
+        item_last_updated = to_utc_iso(item_last_updated_raw) if has_timestamp else None
         pendency_type = str(category).replace("NOT IN BAG / ", "").replace("IN BAG / ", "")
 
         records.append({
@@ -283,7 +307,7 @@ def enrich_dataframe(df, lookups, report_type):
             "last_destination": last_destination,
             "primary_bin": primary_bin,
             "secondary_bin": secondary_bin,
-            "hour": str(item_last_updated)[11:13] if has_timestamp else None,
+            "hour": str(item_last_updated_raw)[11:13] if has_timestamp else None,
             "salvage_type": lookups["exception_salvage"].get(awb, ""),
             "inbound_date": parse_sheet_date(lookups["exception_inbound_date"].get(awb)),
             "block": lookups["exception_block_col"].get(awb, ""),
