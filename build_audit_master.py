@@ -242,7 +242,7 @@ def normalize_timestamp(raw):
     """Keeps item_last_updated as plain IST wall-clock time -- exactly what
     the WMS portal shows, no UTC conversion at all. Every timestamp column
     that stores this (audit_master.item_last_updated, awb_last_seen,
-    awb_scan_events.occurred_at) must be a plain `timestamp` column
+    primary_scan_events/secondary_scan_events.occurred_at) must be a plain `timestamp` column
     (NOT `timestamptz`), otherwise Postgres/Supabase Studio will display
     it in UTC regardless of what's written here. This only re-formats the
     raw CSV value into one consistent string shape."""
@@ -519,41 +519,101 @@ def check_for_updates_and_alert(supabase, records):
 FWD_PFC_TYPES = {"CLIENT Warehouse", "BRSNR"}
 
 
+def _fetch_awb_time_map(supabase, table, time_column):
+    """Small tables only (currently-at-RDC / currently-at-Dock shipments,
+    not the full historical volume) -- cheap to fetch every run. Returns
+    {awb_number: last_recorded_time} so callers can detect a genuinely
+    NEW scan (item_last_updated moved forward) vs. the same snapshot
+    being re-observed by this run's poll."""
+    times = {}
+    start = 0
+    PAGE = 1000
+    while True:
+        resp = supabase.table(table).select(f"awb_number, {time_column}").range(start, start + PAGE - 1).execute()
+        for row in resp.data:
+            times[row["awb_number"]] = row.get(time_column)
+        if len(resp.data) < PAGE:
+            break
+        start += PAGE
+    return times
+
+
+def _is_new_scan(new_time, prev_time):
+    """True if this is a genuinely fresh scan -- either the AWB wasn't
+    tracked before at all, or its item_last_updated has moved forward
+    since we last recorded it. This is what lets a re-scan of a
+    shipment that never left RDC still count (the WMS bumps
+    item_last_updated on every real scan action, even when the
+    category/bin doesn't change), while a repeat poll of the exact same
+    unchanged snapshot does NOT get double-counted."""
+    if prev_time is None:
+        return True
+    nt, pt = _parse_dt(new_time), _parse_dt(prev_time)
+    if nt is None or pt is None:
+        return False
+    return nt > pt
+
+
 def log_primary_secondary_events(supabase, records):
-    """Records a Primary event the first time an FWD shipment is seen at
-    RDC (Received at DC, any bin), and a Secondary event the first time
-    it's seen At Dock -- no stage-history comparison at all, no need to
-    check what it was before. Each AWB only ever gets ONE primary and
-    ONE secondary row, ever (a unique (awb_number, scan_type) constraint
-    in the database silently ignores repeat inserts for a shipment still
-    sitting in the same state run after run). This replaced a much
-    slower version that fetched and compared against a full stage-history
-    table every run."""
+    """Records a Primary event whenever an FWD shipment's item_last_updated
+    moves forward while it's at RDC (Received at DC, any bin), and a
+    Secondary event whenever the same happens At Dock. This catches BOTH:
+      - the shipment leaving RDC and later coming back (a new sighting
+        after being absent), and
+      - the shipment never leaving RDC at all, but being scanned again
+        while still there (item_last_updated still bumps on a real scan
+        action even when the category/bin doesn't change) -- this is
+        specifically what makes an employee's re-scan of the same
+        sitting shipment increase their scan count.
+    It does NOT re-log the same unchanged snapshot being re-observed by
+    consecutive 15-minute polls with no real WMS update in between.
+    "Fresh" is decided against rdc_last_seen / at_dock_last_seen (small
+    tables -- only currently-there shipments, not a full history), never
+    a full-volume stage-comparison table. Primary and Secondary are
+    stored in their OWN separate tables (primary_scan_events /
+    secondary_scan_events), same pattern as pfc_first_seen /
+    rdc_last_seen -- not merged into one table with a scan_type column."""
+    existing_rdc = _fetch_awb_time_map(supabase, "rdc_last_seen", "rdc_time")
+    existing_at_dock = _fetch_awb_time_map(supabase, "at_dock_last_seen", "at_dock_time")
+
+    current_rdc = set()
+    current_at_dock = set()
     primary_rows = []
-    rdc_rows = []  # Sheet 2: latest-seen RDC time, upserted for every shipment currently at RDC
+    secondary_rows = []
+    rdc_rows = []
+    at_dock_rows = []
 
     for r in records:
         if r.get("report_type") != "FWD":
             continue
         pt = (r.get("pendency_type") or "").strip()
+        awb = r["awb_number"]
+        new_time = r.get("item_last_updated")
 
         if pt == "Received at DC":
-            primary_rows.append({
-                "awb_number": r["awb_number"], "scan_type": "primary",
-                "action_user": r.get("action_user"), "emp_name": r.get("emp_name"),
-                "client_name": r.get("client_name"), "layout_name": r.get("layout_name"),
-                "blocks": r.get("blocks"), "occurred_at": r.get("item_last_updated"),
-            })
+            current_rdc.add(awb)
             rdc_rows.append({
-                "awb_number": r["awb_number"], "rdc_time": r.get("item_last_updated"), "bin_level": r.get("bin_level")
+                "awb_number": awb, "rdc_time": new_time, "bin_level": r.get("bin_level")
             })
+            if _is_new_scan(new_time, existing_rdc.get(awb)):
+                primary_rows.append({
+                    "awb_number": awb,
+                    "action_user": r.get("action_user"), "emp_name": r.get("emp_name"),
+                    "client_name": r.get("client_name"), "layout_name": r.get("layout_name"),
+                    "blocks": r.get("blocks"), "occurred_at": new_time,
+                })
         elif pt == "At Dock":
-            primary_rows.append({
-                "awb_number": r["awb_number"], "scan_type": "secondary",
-                "action_user": r.get("action_user"), "emp_name": r.get("emp_name"),
-                "client_name": r.get("client_name"), "layout_name": r.get("layout_name"),
-                "blocks": r.get("blocks"), "occurred_at": r.get("item_last_updated"),
+            current_at_dock.add(awb)
+            at_dock_rows.append({
+                "awb_number": awb, "at_dock_time": new_time
             })
+            if _is_new_scan(new_time, existing_at_dock.get(awb)):
+                secondary_rows.append({
+                    "awb_number": awb,
+                    "action_user": r.get("action_user"), "emp_name": r.get("emp_name"),
+                    "client_name": r.get("client_name"), "layout_name": r.get("layout_name"),
+                    "blocks": r.get("blocks"), "occurred_at": new_time,
+                })
 
     pfc_rows = [
         {"awb_number": r["awb_number"], "first_seen_at": r.get("item_last_updated"), "pendency_type": r.get("pendency_type")}
@@ -561,11 +621,20 @@ def log_primary_secondary_events(supabase, records):
         if r.get("report_type") == "FWD" and (r.get("pendency_type") or "").strip() in FWD_PFC_TYPES
     ]
 
+    rdc_to_clear = list(existing_rdc.keys() - current_rdc)
+    at_dock_to_clear = list(existing_at_dock.keys() - current_at_dock)
+
+    # Plain inserts -- genuine duplicates over time are exactly what's
+    # wanted now (two real scans of the same AWB, hours apart, should
+    # both count), the freshness check above is what stops a shipment
+    # sitting still from being logged every single 15-minute cycle.
     if primary_rows:
         for i in range(0, len(primary_rows), CHUNK_SIZE):
-            supabase.table("awb_scan_events").upsert(
-                primary_rows[i:i + CHUNK_SIZE], on_conflict="awb_number,scan_type", ignore_duplicates=True
-            ).execute()
+            supabase.table("primary_scan_events").insert(primary_rows[i:i + CHUNK_SIZE]).execute()
+
+    if secondary_rows:
+        for i in range(0, len(secondary_rows), CHUNK_SIZE):
+            supabase.table("secondary_scan_events").insert(secondary_rows[i:i + CHUNK_SIZE]).execute()
 
     if pfc_rows:
         for i in range(0, len(pfc_rows), CHUNK_SIZE):
@@ -579,10 +648,26 @@ def log_primary_secondary_events(supabase, records):
                 rdc_rows[i:i + CHUNK_SIZE], on_conflict="awb_number"
             ).execute()
 
-    purge_old_rows(supabase, "awb_scan_events", column="occurred_at")
+    if at_dock_rows:
+        for i in range(0, len(at_dock_rows), CHUNK_SIZE):
+            supabase.table("at_dock_last_seen").upsert(
+                at_dock_rows[i:i + CHUNK_SIZE], on_conflict="awb_number"
+            ).execute()
 
-    print(f"Scan events: {len(primary_rows)} primary/secondary candidates checked (duplicates silently skipped), "
-          f"{len(pfc_rows)} PFC rows, {len(rdc_rows)} RDC rows.")
+    if rdc_to_clear:
+        for i in range(0, len(rdc_to_clear), 200):
+            supabase.table("rdc_last_seen").delete().in_("awb_number", rdc_to_clear[i:i + 200]).execute()
+
+    if at_dock_to_clear:
+        for i in range(0, len(at_dock_to_clear), 200):
+            supabase.table("at_dock_last_seen").delete().in_("awb_number", at_dock_to_clear[i:i + 200]).execute()
+
+    purge_old_rows(supabase, "primary_scan_events", column="occurred_at")
+    purge_old_rows(supabase, "secondary_scan_events", column="occurred_at")
+
+    print(f"Scan events: {len(primary_rows)} new primary, {len(secondary_rows)} new secondary, "
+          f"{len(pfc_rows)} PFC rows, {len(rdc_rows)} RDC rows, {len(at_dock_rows)} At Dock rows, "
+          f"{len(rdc_to_clear)} left RDC, {len(at_dock_to_clear)} left At Dock.")
 
 
 
