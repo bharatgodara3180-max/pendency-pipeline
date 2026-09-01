@@ -111,7 +111,13 @@ def group_rows(rows):
     return order, grouped
 
 
-def render_image(block, scan_type_label, slot_label, layout_order, grouped, grand_total):
+SCAN_RATE_THRESHOLDS = {
+    "primary": {"half": 325, "full": 650},
+    "secondary": {"half": 140, "full": 280},
+}
+
+
+def render_image(block, scan_type, scan_type_label, slot_label, layout_order, grouped, grand_total, is_full_hour):
     pad = 14
     row_h = 28
     col1_w = 260
@@ -148,8 +154,14 @@ def render_image(block, scan_type_label, slot_label, layout_order, grouped, gran
     y += row_h
 
     for layout in layout_order:
+        layout_total = sum(grouped[layout].values())
         draw.rectangle([pad, y, width - pad, y + row_h], outline="#cccccc")
         draw.text((pad + 8, y + 6), layout, font=font_bold, fill="#000000")
+        # Layout header row's count column used to be left blank -- now
+        # shows that layout's own subtotal instead of empty space.
+        ltext = str(layout_total)
+        ltw = draw.textlength(ltext, font=font_bold)
+        draw.text((pad + col1_w + col2_w + (col3_w - ltw) / 2, y + 6), ltext, font=font_bold, fill="#000000")
         y += row_h
         for user, count in grouped[layout].items():
             draw.rectangle([pad, y, width - pad, y + row_h], outline="#eeeeee")
@@ -160,11 +172,15 @@ def render_image(block, scan_type_label, slot_label, layout_order, grouped, gran
             draw.text((pad + col1_w + col2_w + (col3_w - ctw) / 2, y + 6), ctext, font=font, fill="#c00000")
             y += row_h
 
+    # Grand Total: green if it meets the block's scan-rate target for this
+    # scan type + period, red if it's below target.
+    threshold = SCAN_RATE_THRESHOLDS[scan_type]["full" if is_full_hour else "half"]
+    total_color = "#1e7e34" if grand_total >= threshold else "#c00000"
     draw.rectangle([pad, y, width - pad, y + row_h], fill="#dbe5f1", outline="#999999")
     draw.text((pad + 8, y + 6), "Grand Total", font=font_bold, fill="#000000")
     gtext = str(grand_total)
     gtw = draw.textlength(gtext, font=font_bold)
-    draw.text((pad + col1_w + col2_w + (col3_w - gtw) / 2, y + 6), gtext, font=font_bold, fill="#000000")
+    draw.text((pad + col1_w + col2_w + (col3_w - gtw) / 2, y + 6), gtext, font=font_bold, fill=total_color)
 
     buf = BytesIO()
     img.save(buf, format="PNG")
@@ -203,7 +219,7 @@ def main():
 
             layout_order, grouped = group_rows(rows)
             grand_total = len(rows)
-            png_bytes = render_image(block, scan_type_label, slot_label, layout_order, grouped, grand_total)
+            png_bytes = render_image(block, scan_type, scan_type_label, slot_label, layout_order, grouped, grand_total, is_full_hour)
 
             title = f"{block} - {scan_type_label} SCAN RATE ({slot_label})"
             filename = f"{block.replace(' ', '_')}_{scan_type}_{window_start.strftime('%Y%m%d_%H%M')}.png"
