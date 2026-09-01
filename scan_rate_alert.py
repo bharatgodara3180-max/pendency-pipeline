@@ -6,7 +6,7 @@ of awb_number).
 
 Runs on its own schedule (see .github/workflows/scan-rate-alert.yml),
 offset 15 minutes past each natural slot boundary so the underlying
-awb_scan_events data has time to fully settle before being read:
+primary_scan_events / secondary_scan_events data has time to fully settle before being read:
 
   :45 past the hour  -> HALF-HOUR slot, this hour's first half
                         (e.g. the 10:45 run pushes the 10:00-10:30 slot)
@@ -75,14 +75,14 @@ def determine_window():
 
 
 def fetch_events(supabase, scan_type, block, window_start, window_end):
+    table = "primary_scan_events" if scan_type == "primary" else "secondary_scan_events"
     rows = []
     start = 0
     PAGE = 1000
     while True:
         resp = (
-            supabase.table("awb_scan_events")
+            supabase.table(table)
             .select("awb_number, layout_name, action_user")
-            .eq("scan_type", scan_type)
             .eq("blocks", block)
             .gte("occurred_at", window_start.strftime("%Y-%m-%d %H:%M:%S"))
             .lt("occurred_at", window_end.strftime("%Y-%m-%d %H:%M:%S"))
