@@ -125,7 +125,7 @@ def render_image(block, scan_type, scan_type_label, slot_label, layout_order, gr
     col3_w = 170
     width = pad * 2 + col1_w + col2_w + col3_w
 
-    body_rows = sum(1 + len(grouped[layout]) for layout in layout_order)
+    body_rows = sum(len(grouped[layout]) for layout in layout_order)
     height = pad * 2 + row_h * (3 + body_rows + 1)  # slot bar + heading + col header + body + grand total
 
     img = Image.new("RGB", (width, height), "white")
@@ -154,17 +154,14 @@ def render_image(block, scan_type, scan_type_label, slot_label, layout_order, gr
     y += row_h
 
     for layout in layout_order:
-        layout_total = sum(grouped[layout].values())
-        draw.rectangle([pad, y, width - pad, y + row_h], outline="#cccccc")
-        draw.text((pad + 8, y + 6), layout, font=font_bold, fill="#000000")
-        # Layout header row's count column used to be left blank -- now
-        # shows that layout's own subtotal instead of empty space.
-        ltext = str(layout_total)
-        ltw = draw.textlength(ltext, font=font_bold)
-        draw.text((pad + col1_w + col2_w + (col3_w - ltw) / 2, y + 6), ltext, font=font_bold, fill="#000000")
-        y += row_h
+        first_row = True
         for user, count in grouped[layout].items():
             draw.rectangle([pad, y, width - pad, y + row_h], outline="#eeeeee")
+            if first_row:
+                # Layout name shares this row with the first user under it
+                # -- no separate blank header row anymore.
+                draw.text((pad + 8, y + 6), layout, font=font_bold, fill="#000000")
+                first_row = False
             draw.text((pad + col1_w + 8, y + 6), str(user), font=font, fill="#000000")
             draw.rectangle([pad + col1_w + col2_w, y, width - pad, y + row_h], fill="#f8cbcb")
             ctext = str(count)
