@@ -519,156 +519,71 @@ def check_for_updates_and_alert(supabase, records):
 FWD_PFC_TYPES = {"CLIENT Warehouse", "BRSNR"}
 
 
-def get_stage_key(pendency_type, bin_level):
-    """Returns (stage_label, stage_key) for the PFC -> RDC (bin) -> At Dock
-    flow. stage_key is what's actually compared run-to-run; stage_label is
-    just for messages. bin_level is only meaningful (and only checked) at
-    the RDC stage -- whatever its real values are, a change in bin_level
-    while still at RDC is picked up as a bin1->bin2 style move without
-    needing to know those values in advance. Categories outside this flow
-    return (None, None) and are skipped entirely."""
-    pt = (pendency_type or "").strip()
-    if pt in FWD_PFC_TYPES:
-        return "PFC", "PFC"
-    if pt == "Received at DC":
-        bl = (bin_level or "").strip() or "(no bin)"
-        return f"RDC bin {bl}", f"RDC:{bl}"
-    if pt == "At Dock":
-        return "At Dock", "AT_DOCK"
-    return None, None
+def log_primary_secondary_events(supabase, records):
+    """Records a Primary event the first time an FWD shipment is seen at
+    RDC (Received at DC, any bin), and a Secondary event the first time
+    it's seen At Dock -- no stage-history comparison at all, no need to
+    check what it was before. Each AWB only ever gets ONE primary and
+    ONE secondary row, ever (a unique (awb_number, scan_type) constraint
+    in the database silently ignores repeat inserts for a shipment still
+    sitting in the same state run after run). This replaced a much
+    slower version that fetched and compared against a full stage-history
+    table every run."""
+    primary_rows = []
+    rdc_rows = []  # Sheet 2: latest-seen RDC time, upserted for every shipment currently at RDC
 
-
-def check_stage_transitions_and_alert(supabase, records):
-    """Tracks each FWD shipment's PFC -> RDC (bin) -> At Dock movement
-    across pipeline runs, purely for state-keeping -- no ntfy alert of any
-    kind is sent from here. Two specific transitions are logged as
-    scan-throughput events instead (awb_scan_events), credited to
-    whoever's action_user is on the shipment's NEW (post-move) row:
-      Primary   = CLIENT Warehouse -> Received at DC (RDC, any bin)
-      Secondary = Received at DC (RDC, any bin) -> At Dock
-    BRSNR -> RDC is NOT counted as Primary -- only CLIENT Warehouse is.
-    A shipment disappearing from the data (whatever stage it was last at)
-    is handled silently either way -- no alert, no skip-log."""
-    current_by_awb = {}
     for r in records:
         if r.get("report_type") != "FWD":
             continue
-        label, key = get_stage_key(r.get("pendency_type"), r.get("bin_level"))
-        if key is None:
-            continue
-        current_by_awb[r["awb_number"]] = (label, key, r)
+        pt = (r.get("pendency_type") or "").strip()
 
-    previous = {}
-    PAGE = 1000
-    start = 0
-    while True:
-        resp = (
-            supabase.table("awb_stage_last_seen")
-            .select("awb_number, stage_key, stage_label, pendency_type")
-            .range(start, start + PAGE - 1)
-            .execute()
-        )
-        for row in resp.data:
-            previous[row["awb_number"]] = (row["stage_label"], row["stage_key"], row.get("pendency_type"))
-        if len(resp.data) < PAGE:
-            break
-        start += PAGE
-
-    to_upsert = []
-    to_delete = []
-    scan_events = []
-    pfc_first_seen_rows = []   # Sheet 1: first-seen time at PFC (CLIENT Warehouse/BRSNR), for EVERY shipment
-    rdc_last_seen_rows = []    # Sheet 2: latest-seen time at RDC, for EVERY shipment currently at RDC
-    rdc_to_clear = []          # AWBs that left RDC (moved on or gone) -- remove their rdc_last_seen row
-
-    for awb, (label, key, r) in current_by_awb.items():
-        pendency_type = r.get("pendency_type")
-        prev = previous.pop(awb, None)
-
-        if key == "PFC":
-            # Insert-only -- never overwritten, so this always holds the
-            # FIRST time this AWB was ever seen at PFC, regardless of how
-            # many pipeline runs it's been sitting there since.
-            pfc_first_seen_rows.append({
-                "awb_number": awb, "first_seen_at": r.get("item_last_updated"), "pendency_type": pendency_type
+        if pt == "Received at DC":
+            primary_rows.append({
+                "awb_number": r["awb_number"], "scan_type": "primary",
+                "action_user": r.get("action_user"), "emp_name": r.get("emp_name"),
+                "client_name": r.get("client_name"), "layout_name": r.get("layout_name"),
+                "blocks": r.get("blocks"), "occurred_at": r.get("item_last_updated"),
             })
-        elif key.startswith("RDC:"):
-            # Always overwritten with the latest -- this is "where was it
-            # last seen at RDC", used to check against once it reaches
-            # At Dock (Secondary).
-            rdc_last_seen_rows.append({
-                "awb_number": awb, "rdc_time": r.get("item_last_updated"), "bin_level": r.get("bin_level")
+            rdc_rows.append({
+                "awb_number": r["awb_number"], "rdc_time": r.get("item_last_updated"), "bin_level": r.get("bin_level")
             })
-        elif prev is not None and prev[1] is not None and prev[1].startswith("RDC:"):
-            # Was at RDC last run, isn't anymore (moved on or gone) --
-            # this sheet should only ever list shipments CURRENTLY at RDC.
-            rdc_to_clear.append(awb)
+        elif pt == "At Dock":
+            primary_rows.append({
+                "awb_number": r["awb_number"], "scan_type": "secondary",
+                "action_user": r.get("action_user"), "emp_name": r.get("emp_name"),
+                "client_name": r.get("client_name"), "layout_name": r.get("layout_name"),
+                "blocks": r.get("blocks"), "occurred_at": r.get("item_last_updated"),
+            })
 
-        if prev is not None:
-            prev_label, prev_key, prev_pendency_type = prev
-            if prev_pendency_type == "CLIENT Warehouse" and key.startswith("RDC:"):
-                scan_events.append({
-                    "awb_number": awb, "scan_type": "primary",
-                    "action_user": r.get("action_user"), "emp_name": r.get("emp_name"),
-                    "client_name": r.get("client_name"), "layout_name": r.get("layout_name"),
-                    "blocks": r.get("blocks"),
-                    "occurred_at": r.get("item_last_updated"),
-                })
-            elif prev_key is not None and prev_key.startswith("RDC:") and key == "AT_DOCK":
-                scan_events.append({
-                    "awb_number": awb, "scan_type": "secondary",
-                    "action_user": r.get("action_user"), "emp_name": r.get("emp_name"),
-                    "client_name": r.get("client_name"), "layout_name": r.get("layout_name"),
-                    "blocks": r.get("blocks"),
-                    "occurred_at": r.get("item_last_updated"),
-                })
-        to_upsert.append({"awb_number": awb, "stage_key": key, "stage_label": label, "pendency_type": pendency_type})
+    pfc_rows = [
+        {"awb_number": r["awb_number"], "first_seen_at": r.get("item_last_updated"), "pendency_type": r.get("pendency_type")}
+        for r in records
+        if r.get("report_type") == "FWD" and (r.get("pendency_type") or "").strip() in FWD_PFC_TYPES
+    ]
 
-    # Anything still left in `previous` was tracked last run but isn't in
-    # this run's FWD data at all -- it has left the flow entirely. No
-    # alert, no log -- just stop tracking it. If it was sitting at RDC,
-    # clear its rdc_last_seen row too (Sheet 2 only lists AWBs currently
-    # at RDC).
-    for awb, prev_val in previous.items():
-        to_delete.append(awb)
-        if prev_val[1] is not None and prev_val[1].startswith("RDC:"):
-            rdc_to_clear.append(awb)
+    if primary_rows:
+        for i in range(0, len(primary_rows), CHUNK_SIZE):
+            supabase.table("awb_scan_events").upsert(
+                primary_rows[i:i + CHUNK_SIZE], on_conflict="awb_number,scan_type", ignore_duplicates=True
+            ).execute()
 
-    if scan_events:
-        for i in range(0, len(scan_events), CHUNK_SIZE):
-            supabase.table("awb_scan_events").insert(scan_events[i:i + CHUNK_SIZE]).execute()
-
-    if pfc_first_seen_rows:
-        for i in range(0, len(pfc_first_seen_rows), CHUNK_SIZE):
+    if pfc_rows:
+        for i in range(0, len(pfc_rows), CHUNK_SIZE):
             supabase.table("pfc_first_seen").upsert(
-                pfc_first_seen_rows[i:i + CHUNK_SIZE], on_conflict="awb_number", ignore_duplicates=True
+                pfc_rows[i:i + CHUNK_SIZE], on_conflict="awb_number", ignore_duplicates=True
             ).execute()
 
-    if rdc_last_seen_rows:
-        for i in range(0, len(rdc_last_seen_rows), CHUNK_SIZE):
+    if rdc_rows:
+        for i in range(0, len(rdc_rows), CHUNK_SIZE):
             supabase.table("rdc_last_seen").upsert(
-                rdc_last_seen_rows[i:i + CHUNK_SIZE], on_conflict="awb_number"
-            ).execute()
-
-    if rdc_to_clear:
-        for i in range(0, len(rdc_to_clear), 200):
-            supabase.table("rdc_last_seen").delete().in_("awb_number", rdc_to_clear[i:i + 200]).execute()
-
-    if to_upsert:
-        for i in range(0, len(to_upsert), CHUNK_SIZE):
-            supabase.table("awb_stage_last_seen").upsert(
-                to_upsert[i:i + CHUNK_SIZE], on_conflict="awb_number"
-            ).execute()
-
-    if to_delete:
-        for i in range(0, len(to_delete), 200):
-            supabase.table("awb_stage_last_seen").delete().in_(
-                "awb_number", to_delete[i:i + 200]
+                rdc_rows[i:i + CHUNK_SIZE], on_conflict="awb_number"
             ).execute()
 
     purge_old_rows(supabase, "awb_scan_events", column="occurred_at")
 
-    print(f"Stage-tracking: {len(to_upsert)} shipments tracked, {len(to_delete)} left the flow, {len(scan_events)} scan-throughput events logged.")
+    print(f"Scan events: {len(primary_rows)} primary/secondary candidates checked (duplicates silently skipped), "
+          f"{len(pfc_rows)} PFC rows, {len(rdc_rows)} RDC rows.")
+
 
 
 def main():
@@ -723,8 +638,8 @@ def main():
     print("\nChecking for shipment updates...")
     check_for_updates_and_alert(supabase, records)
 
-    print("\nChecking for stage transitions (PFC -> RDC -> At Dock)...")
-    check_stage_transitions_and_alert(supabase, records)
+    print("\nLogging Primary/Secondary scan events...")
+    log_primary_secondary_events(supabase, records)
 
     print("Done.")
 
