@@ -19,10 +19,16 @@ ever sees what's still open. The Findings Status page in the app computes
 the SAME open/closed logic live on every view (so status is visible in
 real time, not just at the two cleanup times) -- this script's only job is
 the twice-daily prune.
+
+Also purges audit_scans rows older than 3 days -- the Audit Reports
+dashboard itself only ever queries "since the last 9 AM" (computed
+client-side), so this is just housekeeping to stop the table growing
+forever, not what makes the dashboard show only today's data.
 """
 
 import os
 import sys
+from datetime import datetime, timedelta, timezone
 
 from supabase import create_client
 
@@ -45,12 +51,23 @@ def fetch_all(supabase, table, select, chunk=1000):
     return rows
 
 
+def purge_old_audit_scans(supabase, days=3):
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    try:
+        supabase.table("audit_scans").delete().lt("scanned_at", cutoff).execute()
+        print(f"Purged audit_scans rows older than {cutoff}.")
+    except Exception as e:
+        print(f"  failed to purge old audit_scans rows: {e}")
+
+
+
 def main():
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
     findings = fetch_all(supabase, "active_findings", "awb_number, pendency_type")
     if not findings:
         print("No active findings -- nothing to check.")
+        purge_old_audit_scans(supabase)
         return
 
     awbs = [f["awb_number"] for f in findings]
@@ -82,6 +99,8 @@ def main():
             supabase.table("active_findings").delete().in_("awb_number", to_close[i:i + CHUNK]).execute()
 
     print(f"Checked {len(findings)} findings, closed {len(to_close)}, {len(findings) - len(to_close)} remain open.")
+
+    purge_old_audit_scans(supabase)
 
 
 if __name__ == "__main__":
