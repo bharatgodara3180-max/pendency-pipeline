@@ -18,5 +18,5 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_TOPIC_SCAN_RATE: ${{ secrets.NTFY_TOPIC_SCAN_RATE }}
         run: python scan_rate_alert.py
