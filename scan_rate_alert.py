@@ -28,10 +28,10 @@ from supabase import create_client
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_SECRET_KEY")
-NTFY_TOPIC = os.environ.get("NTFY_TOPIC")  # same channel as "Shipment updated" alerts
+NTFY_TOPIC_SCAN_RATE = os.environ.get("NTFY_TOPIC_SCAN_RATE")  # dedicated channel for scan-rate images (separate from "Shipment updated" alerts)
 
-if not all([SUPABASE_URL, SUPABASE_KEY, NTFY_TOPIC]):
-    sys.exit("Missing SUPABASE_URL, SUPABASE_SECRET_KEY, or NTFY_TOPIC")
+if not all([SUPABASE_URL, SUPABASE_KEY, NTFY_TOPIC_SCAN_RATE]):
+    sys.exit("Missing SUPABASE_URL, SUPABASE_SECRET_KEY, or NTFY_TOPIC_SCAN_RATE")
 
 IST = timezone(timedelta(hours=5, minutes=30))
 BLOCKS = ["Block A", "Block D"]
@@ -82,7 +82,7 @@ def fetch_events(supabase, scan_type, block, window_start, window_end):
     while True:
         resp = (
             supabase.table(table)
-            .select("awb_number, layout_name, action_user")
+            .select("awb_number, layout_name, action_user, emp_name")
             .eq("blocks", block)
             .gte("occurred_at", window_start.strftime("%Y-%m-%d %H:%M:%S"))
             .lt("occurred_at", window_end.strftime("%Y-%m-%d %H:%M:%S"))
@@ -97,13 +97,15 @@ def fetch_events(supabase, scan_type, block, window_start, window_end):
 
 
 def group_rows(rows):
-    """layout_name -> action_user -> count, in first-seen order (matches
-    how a pivot table naturally lists groups as they're first encountered)."""
+    """layout_name -> employee label -> count, in first-seen order
+    (matches how a pivot table naturally lists groups as they're first
+    encountered). Employee label is the actual name when we have it,
+    falling back to the raw action_user id otherwise."""
     grouped = {}
     order = []
     for r in rows:
         layout = r.get("layout_name") or "(blank)"
-        user = r.get("action_user") or "(blank)"
+        user = r.get("emp_name") or r.get("action_user") or "(blank)"
         if layout not in grouped:
             grouped[layout] = {}
             order.append(layout)
@@ -220,7 +222,7 @@ def main():
 
             title = f"{block} - {scan_type_label} SCAN RATE ({slot_label})"
             filename = f"{block.replace(' ', '_')}_{scan_type}_{window_start.strftime('%Y%m%d_%H%M')}.png"
-            send_image(NTFY_TOPIC, title, filename, png_bytes)
+            send_image(NTFY_TOPIC_SCAN_RATE, title, filename, png_bytes)
             print(f"  {block} / {scan_type}: {grand_total} events, image sent.")
 
     print("Done.")
