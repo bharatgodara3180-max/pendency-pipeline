@@ -77,9 +77,9 @@ def load_reference_sheets():
 LOAD_PENDING_SHEETS = ["SDD LOAD", "AIR LOAD", "NDD LOAD"]
 
 
-def sync_load_pending_summary(supabase):
+def sync_load_pending_summary(store):
     """Reads the 3 Vehicle-Pending tabs (SDD/AIR/NDD LOAD) from the same
-    mapping Google Sheet and mirrors their summary rows into Cloudflare for
+    mapping Google Sheet and mirrors their summary rows into store for
     the TV view's "Load Pending" screen. Same layout on every tab:
       row 2 = SHIPMENT COUNT, row 3 = VEHICLE COUNT, row 5 = status labels
       (Delivered / Intransit / No Load / Vehicle placed; Departure
@@ -286,7 +286,7 @@ def normalize_aging_bucket(val):
     going day by day (7_day, 8_day, 9_day, 10_day, 10+_day, ...), but the
     Live Pendency dashboard only has columns through "6+_day". Anything
     past 6_day gets collapsed into that one bucket -- same normalization
-    as upload_to_Cloudflare.py, kept in sync so audit_master's aging_bucket
+    as upload_to_store.py, kept in sync so audit_master's aging_bucket
     matches what the pendency summary shows."""
     if not val:
         return val
@@ -306,7 +306,7 @@ def normalize_timestamp(raw):
     the WMS portal shows, no UTC conversion at all. Every timestamp column
     that stores this (audit_master.item_last_updated, awb_last_seen,
     primary_scan_events/secondary_scan_events.occurred_at) must be a plain `timestamp` column
-    (NOT `timestamptz`), otherwise Postgres/Cloudflare Studio will display
+    (NOT `timestamptz`), otherwise Postgres/store Studio will display
     it in UTC regardless of what's written here. This only re-formats the
     raw CSV value into one consistent string shape."""
     if raw is None or (isinstance(raw, float) and pd.isna(raw)):
@@ -465,18 +465,18 @@ def send_update_alert(r):
         print(f"  failed to send ntfy alert for {r.get('awb_number')}: {e}")
 
 
-def purge_old_rows(supabase, table, column="detected_at", days=15):
+def purge_old_rows(store, table, column="detected_at", days=15):
     """awb_update_alerts is an append-only log -- without this it grows
     forever. Keeps only the last `days` days of rows."""
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     try:
-        supabase.table(table).delete().lt(column, cutoff).execute()
+        store.table(table).delete().lt(column, cutoff).execute()
         print(f"Purged {table} rows older than {cutoff}.")
     except Exception as e:
         print(f"  failed to purge old {table} rows: {e}")
 
 
-def check_for_updates_and_alert(supabase, records):
+def check_for_updates_and_alert(store, records):
     """Tracks item_last_updated for every 1_day+ shipment (so a baseline
     already exists by the time it reaches 2_day), but only ever sends a
     notification once a shipment is 2_day+ AND its item_last_updated has
@@ -506,7 +506,7 @@ def check_for_updates_and_alert(supabase, records):
     for i in range(0, len(awbs), LOOKUP_CHUNK):
         chunk = awbs[i:i + LOOKUP_CHUNK]
         resp = (
-            supabase.table("awb_last_seen")
+            store.table("awb_last_seen")
             .select("awb_number,item_last_updated")
             .in_("awb_number", chunk)
             .execute()
@@ -522,7 +522,7 @@ def check_for_updates_and_alert(supabase, records):
         send_update_alert(r)
         alerts_sent += 1
         to_upsert.append({"awb_number": awb, "item_last_updated": current_val})
-        supabase.table("awb_update_alerts").insert({
+        store.table("awb_update_alerts").insert({
             "awb_number": awb,
             "aging_bucket": r.get("aging_bucket"),
             "pendency_type": r.get("pendency_type"),
@@ -534,7 +534,7 @@ def check_for_updates_and_alert(supabase, records):
         # tell whether it has since progressed (closed) or not (open).
         # upsert (not insert) so a re-alert on the same AWB just refreshes
         # this row instead of erroring on a duplicate key.
-        supabase.table("active_findings").upsert({
+        store.table("active_findings").upsert({
             "awb_number": awb,
             "report_type": r.get("report_type"),
             "pendency_type": r.get("pendency_type"),
@@ -565,11 +565,11 @@ def check_for_updates_and_alert(supabase, records):
 
     if to_upsert:
         for i in range(0, len(to_upsert), CHUNK_SIZE):
-            supabase.table("awb_last_seen").upsert(
+            store.table("awb_last_seen").upsert(
                 to_upsert[i:i + CHUNK_SIZE], on_conflict="awb_number"
             ).execute()
 
-    purge_old_rows(supabase, "awb_update_alerts")
+    purge_old_rows(store, "awb_update_alerts")
 
     print(f"Update-detection: checked {len(tracked_records)} tracked shipments, sent {alerts_sent} alerts.")
 
@@ -582,7 +582,7 @@ def check_for_updates_and_alert(supabase, records):
 FWD_PFC_TYPES = {"CLIENT Warehouse", "BRSNR"}
 
 
-def _fetch_awb_time_map(supabase, table, time_column):
+def _fetch_awb_time_map(store, table, time_column):
     """Small tables only (currently-at-RDC / currently-at-Dock shipments,
     not the full historical volume) -- cheap to fetch every run. Returns
     {awb_number: last_recorded_time} so callers can detect a genuinely
@@ -592,7 +592,7 @@ def _fetch_awb_time_map(supabase, table, time_column):
     start = 0
     PAGE = 1000
     while True:
-        resp = supabase.table(table).select(f"awb_number, {time_column}").range(start, start + PAGE - 1).execute()
+        resp = store.table(table).select(f"awb_number, {time_column}").range(start, start + PAGE - 1).execute()
         for row in resp.data:
             times[row["awb_number"]] = row.get(time_column)
         if len(resp.data) < PAGE:
@@ -617,7 +617,7 @@ def _is_new_scan(new_time, prev_time):
     return nt > pt
 
 
-def log_primary_secondary_events(supabase, records):
+def log_primary_secondary_events(store, records):
     """Classifies every FWD shipment as Primary or Secondary PURELY by
     bin_level -- the old "at RDC" / "At Dock" pendency_type logic has
     been removed entirely, per requirement:
@@ -632,8 +632,8 @@ def log_primary_secondary_events(supabase, records):
     rdc_last_seen / at_dock_last_seen are reused as the "currently bin
     level 1" / "currently bin level 2" tracking tables (same table
     names, redefined meaning) so no new tables are needed."""
-    existing_primary = _fetch_awb_time_map(supabase, "rdc_last_seen", "rdc_time")
-    existing_secondary = _fetch_awb_time_map(supabase, "at_dock_last_seen", "at_dock_time")
+    existing_primary = _fetch_awb_time_map(store, "rdc_last_seen", "rdc_time")
+    existing_secondary = _fetch_awb_time_map(store, "at_dock_last_seen", "at_dock_time")
 
     current_primary = set()
     current_secondary = set()
@@ -687,40 +687,40 @@ def log_primary_secondary_events(supabase, records):
     # sitting still from being logged every single 15-minute cycle.
     if primary_rows:
         for i in range(0, len(primary_rows), CHUNK_SIZE):
-            supabase.table("primary_scan_events").insert(primary_rows[i:i + CHUNK_SIZE]).execute()
+            store.table("primary_scan_events").insert(primary_rows[i:i + CHUNK_SIZE]).execute()
 
     if secondary_rows:
         for i in range(0, len(secondary_rows), CHUNK_SIZE):
-            supabase.table("secondary_scan_events").insert(secondary_rows[i:i + CHUNK_SIZE]).execute()
+            store.table("secondary_scan_events").insert(secondary_rows[i:i + CHUNK_SIZE]).execute()
 
     if pfc_rows:
         for i in range(0, len(pfc_rows), CHUNK_SIZE):
-            supabase.table("pfc_first_seen").upsert(
+            store.table("pfc_first_seen").upsert(
                 pfc_rows[i:i + CHUNK_SIZE], on_conflict="awb_number", ignore_duplicates=True
             ).execute()
 
     if primary_track_rows:
         for i in range(0, len(primary_track_rows), CHUNK_SIZE):
-            supabase.table("rdc_last_seen").upsert(
+            store.table("rdc_last_seen").upsert(
                 primary_track_rows[i:i + CHUNK_SIZE], on_conflict="awb_number"
             ).execute()
 
     if secondary_track_rows:
         for i in range(0, len(secondary_track_rows), CHUNK_SIZE):
-            supabase.table("at_dock_last_seen").upsert(
+            store.table("at_dock_last_seen").upsert(
                 secondary_track_rows[i:i + CHUNK_SIZE], on_conflict="awb_number"
             ).execute()
 
     if rdc_to_clear:
         for i in range(0, len(rdc_to_clear), 200):
-            supabase.table("rdc_last_seen").delete().in_("awb_number", rdc_to_clear[i:i + 200]).execute()
+            store.table("rdc_last_seen").delete().in_("awb_number", rdc_to_clear[i:i + 200]).execute()
 
     if at_dock_to_clear:
         for i in range(0, len(at_dock_to_clear), 200):
-            supabase.table("at_dock_last_seen").delete().in_("awb_number", at_dock_to_clear[i:i + 200]).execute()
+            store.table("at_dock_last_seen").delete().in_("awb_number", at_dock_to_clear[i:i + 200]).execute()
 
-    purge_old_rows(supabase, "primary_scan_events", column="occurred_at")
-    purge_old_rows(supabase, "secondary_scan_events", column="occurred_at")
+    purge_old_rows(store, "primary_scan_events", column="occurred_at")
+    purge_old_rows(store, "secondary_scan_events", column="occurred_at")
 
     print(f"Scan events: {len(primary_rows)} new primary, {len(secondary_rows)} new secondary, "
           f"{len(pfc_rows)} PFC rows, {len(primary_track_rows)} Primary(bin1) rows, {len(secondary_track_rows)} Secondary(bin2) rows, "
@@ -730,7 +730,7 @@ def log_primary_secondary_events(supabase, records):
 
 def main():
     captured_at = datetime.now(timezone.utc).isoformat()
-    supabase = CFStore()
+    store = CFStore()
 
     print("Loading reference sheets from Google Sheets...")
     ref = load_reference_sheets()
@@ -745,7 +745,7 @@ def main():
         # clears everything). Safer to skip the rebuild this run and keep
         # the last complete version than to replace it with an incomplete
         # one. fwd/rev_pendency_current are unaffected by this -- those
-        # already updated correctly in upload_to_Cloudflare.py.
+        # already updated correctly in upload_to_store.py.
         missing = "FWD" if not fwd_present else "REV"
         print(f"{missing} file missing this run -- skipping audit_master rebuild "
               f"to avoid wiping the other side. Keeping the last complete version.")
@@ -771,14 +771,14 @@ def main():
     put_json("audit_master.json.gz", records)
 
     print("\nChecking for shipment updates...")
-    check_for_updates_and_alert(Cloudflare, records)
+    check_for_updates_and_alert(store, records)
 
     print("\nLogging Primary/Secondary scan events...")
-    log_primary_secondary_events(Cloudflare, records)
+    log_primary_secondary_events(store, records)
 
     print("\nSyncing Load Pending summary (SDD/AIR/NDD LOAD tabs)...")
     try:
-        sync_load_pending_summary(supabase)
+        sync_load_pending_summary(store)
     except Exception as e:
         print(f"  Load Pending sync failed (non-critical, leaving previous data): {e}")
 
