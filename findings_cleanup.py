@@ -30,13 +30,13 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 
-from supabase import create_client
+from cf_store import CFStore
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_SECRET_KEY")
+CF_API_URL = os.environ.get("CF_API_URL")
+CF_API_TOKEN = os.environ.get("CF_API_TOKEN")
 
-if not all([SUPABASE_URL, SUPABASE_KEY]):
-    sys.exit("Missing SUPABASE_URL or SUPABASE_SECRET_KEY")
+if not all([CF_API_URL, CF_API_TOKEN]):
+    sys.exit("Missing CF_API_URL or CF_API_TOKEN")
 
 
 def fetch_all(supabase, table, select, chunk=1000):
@@ -62,7 +62,7 @@ def purge_old_audit_scans(supabase, days=3):
 
 
 def main():
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    supabase = CFStore()
 
     findings = fetch_all(supabase, "active_findings", "awb_number, pendency_type")
     if not findings:

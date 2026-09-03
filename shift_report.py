@@ -15,14 +15,14 @@ import sys
 from datetime import datetime, timedelta, timezone
 
 import requests
-from supabase import create_client
+from cf_store import CFStore
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_SECRET_KEY")
+CF_API_URL = os.environ.get("CF_API_URL")
+CF_API_TOKEN = os.environ.get("CF_API_TOKEN")
 NTFY_SHIFT_TOPIC = os.environ.get("NTFY_SHIFT_TOPIC")
 
-if not all([SUPABASE_URL, SUPABASE_KEY, NTFY_SHIFT_TOPIC]):
-    sys.exit("Missing SUPABASE_URL, SUPABASE_SECRET_KEY, or NTFY_SHIFT_TOPIC")
+if not all([CF_API_URL, CF_API_TOKEN, NTFY_SHIFT_TOPIC]):
+    sys.exit("Missing CF_API_URL, CF_API_TOKEN, or NTFY_SHIFT_TOPIC")
 
 AGING_ORDER = ["2_day", "3_day", "4_day", "5_day", "6_day", "6+_day"]
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -120,7 +120,7 @@ def main():
     ist_hour = now.astimezone(IST).hour
     shift_label = "Night Shift (8PM-8AM)" if ist_hour < 14 else "Day Shift (8AM-8PM)"
 
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    supabase = CFStore()
 
     print(f"Fetching scans between {window_start.isoformat()} and {now.isoformat()}...")
     scans = fetch_all(

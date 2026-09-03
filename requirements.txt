@@ -1,5 +1,4 @@
 pandas
-supabase
 python-dotenv
 playwright
 gspread

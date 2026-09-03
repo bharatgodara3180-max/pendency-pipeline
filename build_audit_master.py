@@ -25,21 +25,21 @@ import pandas as pd
 import requests
 from dateutil import parser as dateutil_parser
 from google.oauth2.service_account import Credentials
-from supabase import create_client
+from cf_store import CFStore, put_json
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_SECRET_KEY")
+CF_API_URL = os.environ.get("CF_API_URL")
+CF_API_TOKEN = os.environ.get("CF_API_TOKEN")
 GOOGLE_SERVICE_ACCOUNT_JSON = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
 AUDIT_SHEET_ID = os.environ.get("AUDIT_SHEET_ID")
 FWD_CSV_PATH = os.environ.get("FWD_CSV_PATH", "fwd_pendency.csv")
 REV_CSV_PATH = os.environ.get("REV_CSV_PATH", "rev_pendency.csv")
-CHUNK_SIZE = 2000  # was 500 -- fewer, larger requests to cut total run time
+CHUNK_SIZE = 500  # was 500 -- fewer, larger requests to cut total run time
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC")           # FWD alerts
 NTFY_TOPIC_REV = os.environ.get("NTFY_TOPIC_REV")    # REV alerts -- separate channel
 
-if not all([SUPABASE_URL, SUPABASE_KEY, GOOGLE_SERVICE_ACCOUNT_JSON, AUDIT_SHEET_ID]):
+if not all([CF_API_URL, CF_API_TOKEN, GOOGLE_SERVICE_ACCOUNT_JSON, AUDIT_SHEET_ID]):
     sys.exit(
-        "Missing one of: SUPABASE_URL, SUPABASE_SECRET_KEY, "
+        "Missing one of: CF_API_URL, CF_API_TOKEN, "
         "GOOGLE_SERVICE_ACCOUNT_JSON, AUDIT_SHEET_ID"
     )
 
@@ -79,7 +79,7 @@ LOAD_PENDING_SHEETS = ["SDD LOAD", "AIR LOAD", "NDD LOAD"]
 
 def sync_load_pending_summary(supabase):
     """Reads the 3 Vehicle-Pending tabs (SDD/AIR/NDD LOAD) from the same
-    mapping Google Sheet and mirrors their summary rows into Supabase for
+    mapping Google Sheet and mirrors their summary rows into Cloudflare for
     the TV view's "Load Pending" screen. Same layout on every tab:
       row 2 = SHIPMENT COUNT, row 3 = VEHICLE COUNT, row 5 = status labels
       (Delivered / Intransit / No Load / Vehicle placed; Departure
@@ -133,16 +133,8 @@ def sync_load_pending_summary(supabase):
         print("Load Pending: nothing read from any tab -- leaving existing data as-is.")
         return
 
-    # Plain delete instead of the truncate_pendency_table RPC -- that RPC
-    # only allows a fixed set of known table names, and adding a new one
-    # there would need a separate Supabase-side change. `.gte("id", 0)`
-    # matches every real row (id is a positive identity column) without
-    # needing that RPC's permission.
-    supabase.table("load_pending_summary").delete().gte("id", 0).execute()
-    for i in range(0, len(records), CHUNK_SIZE):
-        supabase.table("load_pending_summary").insert(records[i:i + CHUNK_SIZE]).execute()
-
-    print(f"Load Pending: synced {len(records)} rows across {len(LOAD_PENDING_SHEETS)} tabs.")
+    put_json("load_pending_summary.json.gz", records)
+    print(f"Load Pending: synced {len(records)} rows across {len(LOAD_PENDING_SHEETS)} tabs to KV.")
 
 
 def build_lookup_maps(ref):
@@ -294,7 +286,7 @@ def normalize_aging_bucket(val):
     going day by day (7_day, 8_day, 9_day, 10_day, 10+_day, ...), but the
     Live Pendency dashboard only has columns through "6+_day". Anything
     past 6_day gets collapsed into that one bucket -- same normalization
-    as upload_to_supabase.py, kept in sync so audit_master's aging_bucket
+    as upload_to_Cloudflare.py, kept in sync so audit_master's aging_bucket
     matches what the pendency summary shows."""
     if not val:
         return val
@@ -314,7 +306,7 @@ def normalize_timestamp(raw):
     the WMS portal shows, no UTC conversion at all. Every timestamp column
     that stores this (audit_master.item_last_updated, awb_last_seen,
     primary_scan_events/secondary_scan_events.occurred_at) must be a plain `timestamp` column
-    (NOT `timestamptz`), otherwise Postgres/Supabase Studio will display
+    (NOT `timestamptz`), otherwise Postgres/Cloudflare Studio will display
     it in UTC regardless of what's written here. This only re-formats the
     raw CSV value into one consistent string shape."""
     if raw is None or (isinstance(raw, float) and pd.isna(raw)):
@@ -738,7 +730,7 @@ def log_primary_secondary_events(supabase, records):
 
 def main():
     captured_at = datetime.now(timezone.utc).isoformat()
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    supabase = CFStore()
 
     print("Loading reference sheets from Google Sheets...")
     ref = load_reference_sheets()
@@ -753,7 +745,7 @@ def main():
         # clears everything). Safer to skip the rebuild this run and keep
         # the last complete version than to replace it with an incomplete
         # one. fwd/rev_pendency_current are unaffected by this -- those
-        # already updated correctly in upload_to_supabase.py.
+        # already updated correctly in upload_to_Cloudflare.py.
         missing = "FWD" if not fwd_present else "REV"
         print(f"{missing} file missing this run -- skipping audit_master rebuild "
               f"to avoid wiping the other side. Keeping the last complete version.")
@@ -774,22 +766,15 @@ def main():
         r["captured_at"] = captured_at
     records = [{k: (None if pd.isna(v) else v) for k, v in r.items()} for r in records]
 
-    print("Clearing previous audit_master snapshot...")
-    supabase.rpc("truncate_pendency_table", {"target_table": "audit_master"}).execute()
-
     total = len(records)
-    print(f"Inserting {total} audit_master rows...")
-    for i in range(0, total, CHUNK_SIZE):
-        supabase.table("audit_master").insert(records[i:i + CHUNK_SIZE]).execute()
-        done = min(i + CHUNK_SIZE, total)
-        if done % 5000 == 0 or done == total:
-            print(f"  {done}/{total} rows")
+    print(f"Writing {total} audit_master rows to compressed KV snapshot...")
+    put_json("audit_master.json.gz", records)
 
     print("\nChecking for shipment updates...")
-    check_for_updates_and_alert(supabase, records)
+    check_for_updates_and_alert(Cloudflare, records)
 
     print("\nLogging Primary/Secondary scan events...")
-    log_primary_secondary_events(supabase, records)
+    log_primary_secondary_events(Cloudflare, records)
 
     print("\nSyncing Load Pending summary (SDD/AIR/NDD LOAD tabs)...")
     try:

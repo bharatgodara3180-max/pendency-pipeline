@@ -24,14 +24,14 @@ from io import BytesIO
 
 import requests
 from PIL import Image, ImageDraw, ImageFont
-from supabase import create_client
+from cf_store import CFStore
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_SECRET_KEY")
+CF_API_URL = os.environ.get("CF_API_URL")
+CF_API_TOKEN = os.environ.get("CF_API_TOKEN")
 NTFY_TOPIC_SCAN_RATE = os.environ.get("NTFY_TOPIC_SCAN_RATE")  # dedicated channel for scan-rate images (separate from "Shipment updated" alerts)
 
-if not all([SUPABASE_URL, SUPABASE_KEY, NTFY_TOPIC_SCAN_RATE]):
-    sys.exit("Missing SUPABASE_URL, SUPABASE_SECRET_KEY, or NTFY_TOPIC_SCAN_RATE")
+if not all([CF_API_URL, CF_API_TOKEN, NTFY_TOPIC_SCAN_RATE]):
+    sys.exit("Missing CF_API_URL, CF_API_TOKEN, or NTFY_TOPIC_SCAN_RATE")
 
 IST = timezone(timedelta(hours=5, minutes=30))
 BLOCKS = ["Block A", "Block D"]
@@ -204,7 +204,7 @@ def send_image(topic, title, filename, png_bytes):
 
 
 def main():
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    supabase = CFStore()
     window_start, window_end, slot_label, is_full_hour = determine_window()
     kind = "full-hour" if is_full_hour else "half-hour"
     print(f"Slot: {slot_label} ({kind}), querying {window_start.isoformat()} to {window_end.isoformat()}")
