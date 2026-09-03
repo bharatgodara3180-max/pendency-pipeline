@@ -13,10 +13,10 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install dependencies
-        run: pip install supabase requests Pillow
+        run: pip install -r requirements.txt
       - name: Send scan rate alerts
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          CF_API_URL: ${{ secrets.CF_API_URL }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           NTFY_TOPIC_SCAN_RATE: ${{ secrets.NTFY_TOPIC_SCAN_RATE }}
         run: python scan_rate_alert.py

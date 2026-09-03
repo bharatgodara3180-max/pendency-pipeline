@@ -13,9 +13,9 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install dependencies
-        run: pip install supabase
+        run: pip install -r requirements.txt
       - name: Run findings cleanup
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          CF_API_URL: ${{ secrets.CF_API_URL }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
         run: python findings_cleanup.py
