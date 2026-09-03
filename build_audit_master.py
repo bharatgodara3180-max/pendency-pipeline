@@ -133,7 +133,12 @@ def sync_load_pending_summary(supabase):
         print("Load Pending: nothing read from any tab -- leaving existing data as-is.")
         return
 
-    supabase.rpc("truncate_pendency_table", {"target_table": "load_pending_summary"}).execute()
+    # Plain delete instead of the truncate_pendency_table RPC -- that RPC
+    # only allows a fixed set of known table names, and adding a new one
+    # there would need a separate Supabase-side change. `.gte("id", 0)`
+    # matches every real row (id is a positive identity column) without
+    # needing that RPC's permission.
+    supabase.table("load_pending_summary").delete().gte("id", 0).execute()
     for i in range(0, len(records), CHUNK_SIZE):
         supabase.table("load_pending_summary").insert(records[i:i + CHUNK_SIZE]).execute()
 
