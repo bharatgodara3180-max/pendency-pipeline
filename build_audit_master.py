@@ -74,6 +74,72 @@ def load_reference_sheets():
         "Stagging": rows("Stagging"),
     }
 
+LOAD_PENDING_SHEETS = ["SDD LOAD", "AIR LOAD", "NDD LOAD"]
+
+
+def sync_load_pending_summary(supabase):
+    """Reads the 3 Vehicle-Pending tabs (SDD/AIR/NDD LOAD) from the same
+    mapping Google Sheet and mirrors their summary rows into Supabase for
+    the TV view's "Load Pending" screen. Same layout on every tab:
+      row 2 = SHIPMENT COUNT, row 3 = VEHICLE COUNT, row 5 = status labels
+      (Delivered / Intransit / No Load / Vehicle placed; Departure
+      pending / Grand Total / ...), column A is just the "VEHICLE NO."
+      label. Whatever labels/columns actually exist are read dynamically
+      -- nothing about the exact column layout is hardcoded, only the
+      row numbers (2/3/5) are fixed, since that's the one thing confirmed
+      identical across all three tabs."""
+    creds_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
+    creds = Credentials.from_service_account_info(
+        creds_info, scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"]
+    )
+    gc = gspread.authorize(creds)
+    sh = gc.open_by_key(AUDIT_SHEET_ID)
+
+    def to_num(v):
+        try:
+            return int(str(v).replace(",", "").strip())
+        except (ValueError, TypeError):
+            return None
+
+    records = []
+    for tab_name in LOAD_PENDING_SHEETS:
+        try:
+            rows = sh.worksheet(tab_name).get_all_values()
+        except gspread.exceptions.WorksheetNotFound:
+            print(f"WARNING: Load Pending worksheet '{tab_name}' not found -- skipping.")
+            continue
+        if len(rows) < 5:
+            print(f"WARNING: '{tab_name}' has fewer than 5 rows -- skipping.")
+            continue
+
+        shipment_row = rows[1]  # row 2
+        vehicle_row = rows[2]   # row 3
+        header_row = rows[4]    # row 5
+
+        for col_idx in range(1, len(header_row)):  # skip column A (the "VEHICLE NO." label column)
+            label = header_row[col_idx].strip() if col_idx < len(header_row) else ""
+            if not label:
+                continue
+            shipment_val = shipment_row[col_idx] if col_idx < len(shipment_row) else ""
+            vehicle_val = vehicle_row[col_idx] if col_idx < len(vehicle_row) else ""
+            records.append({
+                "sheet_name": tab_name,
+                "status_label": label,
+                "shipment_count": to_num(shipment_val),
+                "vehicle_count": to_num(vehicle_val),
+            })
+
+    if not records:
+        print("Load Pending: nothing read from any tab -- leaving existing data as-is.")
+        return
+
+    supabase.rpc("truncate_pendency_table", {"target_table": "load_pending_summary"}).execute()
+    for i in range(0, len(records), CHUNK_SIZE):
+        supabase.table("load_pending_summary").insert(records[i:i + CHUNK_SIZE]).execute()
+
+    print(f"Load Pending: synced {len(records)} rows across {len(LOAD_PENDING_SHEETS)} tabs.")
+
+
 def build_lookup_maps(ref):
     # EXCEPTION columns: A=AWB, B=Category, C=Moved to GA, D=POC,
     # E=Pending With, F=Status, G=Inbound Date, H=Block
@@ -719,6 +785,12 @@ def main():
 
     print("\nLogging Primary/Secondary scan events...")
     log_primary_secondary_events(supabase, records)
+
+    print("\nSyncing Load Pending summary (SDD/AIR/NDD LOAD tabs)...")
+    try:
+        sync_load_pending_summary(supabase)
+    except Exception as e:
+        print(f"  Load Pending sync failed (non-critical, leaving previous data): {e}")
 
     print("Done.")
 
