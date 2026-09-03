@@ -1,0 +1,4328 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Scan & Sort</title>
+  <link rel="icon" type="image/png" href="data:image/png;base64,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">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      background: #f5f7fa;
+    }
+
+    .header {
+      background: #fff;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      border-bottom: 1px solid #e0e0e0;
+      font-size: 20px;
+      font-weight: 600;
+      color: #222;
+    }
+
+    .content {
+      padding: 20px;
+    }
+
+    .label {
+      font-size: 15px;
+      color: #555;
+      margin-bottom: 8px;
+    }
+
+    .input-row {
+      display: flex;
+      align-items: center;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      padding: 4px 16px;
+    }
+
+    .cam-scan-btn {
+      flex-shrink: 0;
+      background: none;
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      padding: 4px 6px;
+      line-height: 1;
+    }
+
+    /* Camera overlays directly ON its own input box (same position/size)
+       instead of adding a panel below it -- the parent ".cam-input-wrap"
+       gives it something to size against. */
+    .cam-input-wrap {
+      position: relative;
+    }
+
+    .cam-inline {
+      display: none;
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      border-radius: 10px;
+      overflow: hidden;
+      z-index: 40;
+      /* #screenScan .content sets pointer-events:none on its children;
+         the camera panel has its own controls so it must opt back in. */
+      pointer-events: auto;
+    }
+
+    .cam-inline .cam-reader {
+      width: 100%;
+      height: 100%;
+    }
+
+    .cam-inline .cam-reader video {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover;
+    }
+
+    .cam-inline .cam-bar {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 3px 8px;
+      color: #fff;
+      font-size: 10px;
+      background: rgba(0,0,0,0.6);
+      transition: background 0.15s ease;
+    }
+
+    .cam-inline .cam-bar.cam-bar-success {
+      background: rgba(30,126,52,0.9);
+      font-weight: 700;
+    }
+
+    .cam-inline .cam-close {
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 17px;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .cam-scan-btn.cam-active {
+      color: #c62828;
+    }
+
+    #barcodeInput,
+    #areaInput {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-size: 18px;
+      padding: 14px 0;
+      background: transparent;
+    }
+
+    #loadingBar {
+      margin-top: 14px;
+      font-size: 14px;
+      color: #c62828;
+      font-weight: 600;
+    }
+
+    .result-card {
+      margin-top: 24px;
+      border-radius: 12px;
+      padding: 20px;
+      display: none;
+    }
+
+    .result-card.success {
+      background: #e6f7ec;
+      border: 2px solid #2e7d32;
+    }
+
+    .result-card.error {
+      background: #fdeaea;
+      border: 2px solid #c62828;
+    }
+
+    .result-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 7px 0;
+      font-size: 16px;
+      border-bottom: 1px solid rgba(0,0,0,0.08);
+    }
+
+    .result-row:last-child {
+      border-bottom: none;
+    }
+
+    .result-row .k {
+      color: #444;
+      font-weight: 600;
+    }
+
+    .result-row .v {
+      color: #111;
+      text-align: right;
+      font-weight: 600;
+    }
+
+    .rc-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .rc-awb {
+      font-size: 17px;
+      font-weight: 700;
+      color: #111;
+      word-break: break-all;
+    }
+
+    .rc-badge {
+      font-size: 13px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.6);
+      border: 1px solid rgba(0,0,0,0.15);
+      flex-shrink: 0;
+      margin-left: 8px;
+      color: #111;
+    }
+
+    .rc-lastscan {
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 14px;
+    }
+
+    .rc-bin-label {
+      text-align: center;
+      font-size: 13px;
+      color: #444;
+      font-weight: 600;
+    }
+
+    .rc-bin-value {
+      text-align: center;
+      font-size: 44px;
+      font-weight: 800;
+      color: #111;
+      margin: 4px 0 16px;
+      line-height: 1;
+    }
+
+    .rc-grid {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-top: 1px solid rgba(0,0,0,0.08);
+    }
+
+    .rc-cell {
+      flex: 1;
+    }
+
+    .rc-cell:last-child {
+      text-align: right;
+    }
+
+    .rc-cell-label {
+      font-size: 12px;
+      color: #555;
+      font-weight: 600;
+    }
+
+    .rc-cell-value {
+      font-size: 16px;
+      font-weight: 700;
+      color: #111;
+      margin-top: 2px;
+    }
+
+    .banner {
+      font-size: 19px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    .success .banner {
+      color: #2e7d32;
+    }
+
+    .error .banner {
+      color: #c62828;
+    }
+
+    .stats-card {
+      margin-top: 16px;
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 12px;
+      padding: 16px 20px;
+    }
+
+    .stats-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 16px;
+    }
+
+    .stats-row .k {
+      color: #555;
+    }
+
+    .stats-row .v {
+      font-weight: 700;
+      color: #222;
+    }
+
+    .stats-row .v.found {
+      color: #c62828;
+    }
+
+    .stats-row .v.total {
+      color: #2e7d32;
+    }
+
+    #screenLogin,
+    #screenFloorAudit,
+    #screenPassword {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 80vh;
+      padding: 24px;
+    }
+
+    .login-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #222;
+      margin-bottom: 24px;
+    }
+
+    .emp-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      width: 100%;
+      max-width: 320px;
+    }
+
+    .emp-btn {
+      background: #fff;
+      border: 2px solid #ccc;
+      border-radius: 12px;
+      padding: 24px 0;
+      font-size: 18px;
+      font-weight: 700;
+      color: #333;
+      cursor: pointer;
+    }
+
+    .emp-btn:active {
+      background: #eef2f7;
+    }
+
+    .pass-box {
+      width: 100%;
+      max-width: 320px;
+    }
+
+    .pass-box input {
+      width: 100%;
+      font-size: 18px;
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      margin-bottom: 14px;
+      text-align: center;
+    }
+
+    .pass-box button {
+      width: 100%;
+      font-size: 17px;
+      font-weight: 700;
+      padding: 14px;
+      border-radius: 10px;
+      border: none;
+      background: #2563eb;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    #passError {
+      color: #c62828;
+      font-size: 14px;
+      text-align: center;
+      margin-bottom: 10px;
+      display: none;
+    }
+
+    .back-link {
+      margin-top: 16px;
+      color: #2563eb;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .dash-link-btn {
+      margin-top: 24px;
+      width: 100%;
+      max-width: 320px;
+      background: #111827;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    #screenScan {
+      display: none;
+    }
+
+    #screenScan .content {
+      pointer-events: none;
+    }
+
+    #screenScan .content .scan-target {
+      pointer-events: auto;
+    }
+
+    #screenScan > .header {
+      pointer-events: none;
+    }
+
+    #screenScan > .header #scanBackBtn {
+      pointer-events: auto;
+    }
+
+    .area-row.locked {
+      background: #eef2f7;
+    }
+
+    .area-row.locked #areaInput {
+      color: #555;
+    }
+
+    .area-row.scanned {
+      background: #e6f7ec;
+      border: 2px solid #2e7d32;
+    }
+
+    .area-row.scanned #areaInput {
+      color: #2e7d32;
+      font-weight: 700;
+    }
+
+    .area-row.err {
+      background: #fdeaea;
+      border: 2px solid #c62828;
+    }
+
+    .area-row.err #areaInput {
+      color: #c62828;
+    }
+
+    .area-hint {
+      font-size: 13px;
+      color: #888;
+      margin-top: 6px;
+    }
+
+    .area-hint.err-text {
+      color: #c62828;
+      font-weight: 700;
+    }
+
+    .handover-box {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 500;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 14vh;
+      /* #screenScan .content sets pointer-events:none on everything inside
+         it -- this has to explicitly opt back in, otherwise clicks meant
+         to be blocked by this backdrop would fall straight through to the
+         Scan AWB input / result card underneath. */
+      pointer-events: auto;
+    }
+
+    .handover-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 22px;
+      max-width: 340px;
+      width: 88%;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+    }
+
+    .handover-label {
+      color: #c62828;
+      font-weight: 800;
+      font-size: 18px;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    #screenDashboard {
+      display: none;
+    }
+
+    #screenPendency {
+      display: none;
+    }
+
+    .pend-section-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #222;
+      margin: 18px 0 8px;
+    }
+
+    .pend-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      font-size: 12px;
+    }
+
+    .pend-table th,
+    .pend-table td {
+      padding: 8px 6px;
+      text-align: right;
+      border-bottom: 1px solid #eee;
+      white-space: nowrap;
+    }
+
+    .pend-table th:first-child,
+    .pend-table td:first-child {
+      text-align: left;
+    }
+
+    .pend-table th {
+      background: #f0f2f5;
+      color: #444;
+    }
+
+    .pend-table tr.pend-total-row td {
+      font-weight: 700;
+      background: #f0f2f5;
+      border-top: 2px solid #ccc;
+    }
+
+    .pend-table td.pend-total-col {
+      font-weight: 700;
+      color: #2563eb;
+    }
+
+    .pend-category-btn,
+    .pend-expand-btn {
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+      font: inherit;
+      color: #111;
+      padding: 2px 4px;
+      text-align: left;
+    }
+
+    .pend-category-btn {
+      font-weight: 600;
+      width: 100%;
+    }
+
+    .pend-category-btn:hover,
+    .pend-expand-btn:hover {
+      text-decoration: underline;
+    }
+
+    .pend-arrow {
+      display: inline-block;
+      width: 16px;
+      transition: transform .15s ease;
+      font-size: 11px;
+      color: #666;
+    }
+
+    .pend-arrow.open {
+      transform: rotate(90deg);
+    }
+
+    .pend-drill-row td {
+      background: #fafafa;
+      padding: 0 !important;
+    }
+
+    .pend-drill-wrap {
+      padding: 8px 8px 10px 22px;
+      border-left: 3px solid #e5e7eb;
+    }
+
+    .pend-drill-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .pend-drill-table th,
+    .pend-drill-table td {
+      padding: 6px 6px;
+      border-bottom: 1px solid #eee;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .pend-drill-table th:first-child,
+    .pend-drill-table td:first-child {
+      text-align: left;
+    }
+
+    .pend-drill-table th {
+      color: #666;
+      font-weight: 600;
+    }
+
+    .pend-count-btn {
+      border: 0;
+      background: transparent;
+      color: #2563eb;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 600;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+
+    .pend-count-btn:hover {
+      background: #eff6ff;
+      text-decoration: underline;
+    }
+
+    .pend-count-btn:disabled {
+      color: #aaa;
+      cursor: default;
+      text-decoration: none;
+      background: transparent;
+    }
+
+    .pend-download-note {
+      color: #888;
+      font-size: 11px;
+      margin: 6px 0 0 4px;
+    }
+
+    .dash-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .dash-table th,
+    .dash-table td {
+      padding: 10px 12px;
+      font-size: 14px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+    }
+
+    .dash-table th {
+      background: #f0f2f5;
+      color: #444;
+    }
+
+    .dash-table td.num {
+      text-align: right;
+      font-weight: 700;
+    }
+
+    .dash-table th.num {
+      text-align: right;
+    }
+
+    .dash-table td.num.found-col {
+      color: #c62828;
+    }
+
+    .dash-table td.num.total-col {
+      color: #2e7d32;
+    }
+
+    .dash-subtotal td {
+      background: #f0f2f5;
+      font-weight: 700;
+      border-top: 2px solid #ccc;
+    }
+
+    .dash-updated {
+      font-size: 12px;
+      color: #999;
+      margin: 10px 0;
+      text-align: right;
+    }
+
+    .dash-grand {
+      font-size: 15px;
+      font-weight: 700;
+      text-align: center;
+      margin: 0 0 12px;
+      padding: 12px;
+      background: #fff;
+      border-radius: 10px;
+      border: 1px solid #e0e0e0;
+      color: #222;
+    }
+
+    .dash-grand .found {
+      color: #c62828;
+    }
+
+    .dash-grand .total {
+      color: #2e7d32;
+    }
+
+    #screenResetConfirm {
+      display: none;
+    }
+
+    .reset-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 80vh;
+      padding: 24px;
+    }
+
+    .reset-warning-text {
+      max-width: 320px;
+      text-align: center;
+      color: #555;
+      font-size: 15px;
+      margin-bottom: 24px;
+    }
+
+    .reset-confirm-btn {
+      width: 100%;
+      max-width: 320px;
+      font-size: 17px;
+      font-weight: 700;
+      padding: 14px;
+      border-radius: 10px;
+      border: none;
+      background: #c62828;
+      color: #fff;
+      cursor: pointer;
+    }
+    .pend-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .pend-btn {
+      background: #eee;
+      color: #333;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .pend-btn.active {
+      background: #0f766e;
+      color: #fff;
+    }
+
+    .lastscan-table-scroll {
+      overflow-x: auto;
+    }
+
+    /* Hourly Performance: autofit to a laptop screen -- the filter rows
+       stay put, the table area scrolls internally (both directions) so
+       nothing forces the whole page to scroll vertically past the
+       viewport on a desktop browser. */
+    #screenHourlyPerf {
+      display: none;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #screenHourlyPerf #hourlyPerfContent {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      padding-bottom: 8px;
+    }
+
+    #hourlyPerfTableWrap {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      position: relative;
+    }
+
+    #screenHourlyPerf .pend-table {
+      font-size: 12px;
+    }
+
+    #screenHourlyPerf .pend-table th,
+    #screenHourlyPerf .pend-table td {
+      padding: 3px 6px;
+    }
+
+    /* Header row and Grand Total row stay pinned in view while the
+       (potentially long) employee list in between scrolls -- the
+       colour-coded totals are the most important numbers here and must
+       always be visible without hunting for them. */
+    #hourlyPerfTableWrap thead th {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+
+    #hourlyPerfTableWrap tr.pend-total-row {
+      position: sticky;
+      bottom: 0;
+      z-index: 5;
+    }
+
+    #hourlyPerfTableWrap tr.pend-total-row td {
+      background: #dbe5f1;
+    }
+
+    .lastscan-table {
+      border-collapse: collapse;
+      font-size: 12px;
+      white-space: nowrap;
+      width: 100%;
+    }
+
+    .lastscan-table th,
+    .lastscan-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #eee;
+      text-align: left;
+    }
+
+    .lastscan-table th {
+      background: #f0f2f5;
+      position: sticky;
+      top: 0;
+    }
+
+    .findings-badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .findings-badge.open {
+      background: #fdecea;
+      color: #c62828;
+    }
+
+    .findings-badge.closed {
+      background: #e6f4ea;
+      color: #1e7e34;
+    }
+
+  </style>
+</head>
+
+<body>
+
+  <div id="screenLogin">
+    <div class="login-title">Dashboard</div>
+    <button class="dash-link-btn" id="openFloorAuditBtn" style="background:#111827;">🧍 FLOOR AUDIT</button>
+    <button class="dash-link-btn" id="openDashboardBtn" style="background:#7c3aed; margin-top:12px;">📊 AUDIT REPORTS</button>
+    <button class="dash-link-btn" id="openPendencyBtn" style="background:#0f766e; margin-top:12px;">📦 LIVE PENDENCY</button>
+    <button class="dash-link-btn" id="openTrackingBtn" style="background:#0369a1; margin-top:12px;">🔍 SINGLE TRACKING</button>
+    <button class="dash-link-btn" id="openLastScanBtn" style="background:#b45309; margin-top:12px;">🕐 LAST SCAN DETAILS</button>
+    <button class="dash-link-btn" id="openFindingsBtn" style="background:#9d174d; margin-top:12px;">🔎 FINDINGS STATUS</button>
+    <button class="dash-link-btn" id="openHourlyPerfBtn" style="background:#0e7490; margin-top:12px;">⏱ HOURLY PERFORMANCE</button>
+    <button class="dash-link-btn" id="openResetBtn" style="background:#c62828; margin-top:12px;">🗑️ RESET AUDIT DATA</button>
+  </div>
+
+  <div id="screenFloorAudit" style="display:none;">
+    <div class="login-title">Select Employee</div>
+    <div class="emp-grid">
+      <button class="emp-btn" data-emp="BLOCK A_1">BLOCK_A_1</button>
+      <button class="emp-btn" data-emp="BLOCK A_2">BLOCK_A_2</button>
+      <button class="emp-btn" data-emp="BLOCK D_1">BLOCK_D_1</button>
+      <button class="emp-btn" data-emp="BLOCK D_2">BLOCK_D_2</button>
+      <button class="emp-btn" data-emp="BLOCK B_1">BLOCK_B_1</button>
+      <button class="emp-btn" data-emp="BLOCK B_2">BLOCK_B_2</button>
+    </div>
+    <div class="back-link" id="floorAuditBack" style="margin-top:20px;">&#8592; Back to Dashboard</div>
+  </div>
+
+  <div id="screenDashboard">
+    <div class="header">
+      <span id="dashBack" style="cursor:pointer;">&#8592;</span>
+      <span>Audit Reports</span>
+    </div>
+    <div class="content">
+      <div class="dash-updated" id="dashUpdated">-</div>
+      <div id="auditFilters" style="margin-bottom:10px;"></div>
+      <div id="ageingMatrixByEmp"></div>
+    </div>
+  </div>
+
+  <div id="screenPendency">
+    <div class="header">
+      <span id="pendencyBack" style="cursor:pointer;">&#8592;</span>
+      <span>Live Pendency</span>
+    </div>
+    <div class="content">
+      <div class="dash-updated" id="pendencyUpdated">-</div>
+      <div id="pendencyRefreshBanner" style="display:none; background:#fff7e6; border:1px solid #f0b429; color:#7a4c00; padding:8px 12px; border-radius:8px; margin-bottom:10px; font-size:13px; align-items:center; justify-content:space-between; gap:10px;">
+        <span>🔄 Newer data is available — please refresh.</span>
+        <button id="pendencyRefreshNowBtn" style="background:#f0b429;border:none;border-radius:6px;padding:6px 10px;font-weight:700;cursor:pointer;flex-shrink:0;">Refresh Now</button>
+      </div>
+      <div id="pendencyFilters" style="margin-bottom:10px;"></div>
+      <div id="pendencyTables"></div>
+    </div>
+  </div>
+
+  <div id="screenTracking" style="display:none;">
+    <div class="header">
+      <span id="trackingBack" style="cursor:pointer;">&#8592;</span>
+      <span>Single Tracking</span>
+    </div>
+    <div class="content">
+      <div class="label">AWB / Manifest Code / Seal Number</div>
+      <div class="cam-input-wrap">
+<div class="input-row">
+        <input type="text" id="trackingInput" placeholder="Type or scan AWB / Manifest / Seal number"
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <button type="button" class="cam-scan-btn" data-target="trackingInput" title="Scan with camera">📷</button>
+      </div>
+      <div class="cam-inline" id="camPanel_trackingInput">
+      <div class="cam-reader" id="camReader_trackingInput"></div>
+      <div class="cam-bar"><span>Point at barcode/QR</span><button type="button" class="cam-close" data-cam-close="trackingInput">&times;</button></div>
+      </div>
+      </div>
+      <button class="dash-link-btn" id="trackingSearchBtn" style="background:#0369a1; margin-top:12px;">SEARCH</button>
+      <div id="trackingResult" style="margin-top:18px;"></div>
+    </div>
+  </div>
+
+  <div id="screenLastScan" style="display:none;">
+    <div class="header">
+      <span id="lastScanBack" style="cursor:pointer;">&#8592;</span>
+      <span>Last Scan Details</span>
+    </div>
+    <div class="content">
+      <div class="pend-actions" id="lastScanReportBtns">
+        <button class="pend-btn more active" data-report="FWD">Forward</button>
+        <button class="pend-btn more" data-report="REV">Reverse</button>
+      </div>
+      <div class="pend-actions" id="lastScanCategoryBtns"></div>
+      <div class="pend-actions" id="lastScanBlockBtns"></div>
+      <div id="lastScanTableWrap"></div>
+    </div>
+  </div>
+
+  <div id="screenFindings" style="display:none;">
+    <div class="header">
+      <span id="findingsBack" style="cursor:pointer;">&#8592;</span>
+      <span>Findings Status</span>
+    </div>
+    <div class="content">
+      <div class="dash-updated" id="findingsUpdated">-</div>
+      <div id="findingsTables"></div>
+    </div>
+  </div>
+
+  <div id="screenHourlyPerf" style="display:none;">
+    <div class="header">
+      <span id="hourlyPerfBack" style="cursor:pointer;">&#8592;</span>
+      <span>Hourly Performance</span>
+    </div>
+    <div class="content" id="hourlyPerfContent">
+      <div class="pend-actions" id="hpAllFilters" style="row-gap:6px;">
+        <button class="pend-btn more active" id="hpBlockABtn">Block A</button>
+        <button class="pend-btn more" id="hpBlockDBtn">Block D</button>
+        <span style="border-left:1px solid #ccc;height:20px;margin:0 2px;align-self:center;"></span>
+        <button class="pend-btn more active" id="hpPrimaryBtn">Primary</button>
+        <button class="pend-btn more" id="hpSecondaryBtn">Secondary</button>
+        <span style="border-left:1px solid #ccc;height:20px;margin:0 2px;align-self:center;"></span>
+        <span id="hpCategoryBtns" style="display:contents;">
+          <button class="pend-btn" data-hp-cat="AIR">AIR</button>
+          <button class="pend-btn" data-hp-cat="ZONAL">ZONAL</button>
+          <button class="pend-btn" data-hp-cat="INTRA">INTRA</button>
+          <button class="pend-btn" data-hp-cat="MUVRO">MUVRO</button>
+        </span>
+        <span style="border-left:1px solid #ccc;height:20px;margin:0 2px;align-self:center;"></span>
+        <span id="hpHourBtns" style="display:contents;"></span>
+      </div>
+      <div id="hourlyPerfTableWrap"></div>
+    </div>
+  </div>
+
+  <div id="screenPassword" style="display:none;">
+    <div class="login-title" id="passTitle">Enter Password</div>
+    <div class="pass-box">
+      <div id="passError">Incorrect password, please try again.</div>
+      <input type="password" id="passwordInput" placeholder="Password" inputmode="numeric">
+      <button id="passSubmitBtn">Login</button>
+    </div>
+    <div class="back-link" id="backToSelect">&#8592; Back</div>
+  </div>
+
+  <div id="screenResetConfirm">
+    <div class="reset-wrap">
+      <div class="login-title" style="color:#c62828;">⚠️ Reset Audit Data</div>
+      <div class="reset-warning-text">
+        This will clear all scan history (for every employee). This action cannot be undone.
+      </div>
+      <button id="confirmResetBtn" class="reset-confirm-btn">RESET</button>
+      <div class="back-link" id="backFromResetConfirm">&#8592; Cancel</div>
+    </div>
+  </div>
+
+  <div id="screenScan">
+    <div class="header">
+      <span id="scanBackBtn">&#8592;</span>
+      <span id="scanHeaderTitle">Scan & Sort</span>
+    </div>
+
+    <div class="content">
+      <div class="label">Scanned Area Barcode</div>
+      <div class="cam-input-wrap">
+<div class="input-row area-row scan-target" id="areaRow">
+        <input type="text" id="areaInput" placeholder="Scan area barcode here" inputmode="none"
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <button type="button" class="cam-scan-btn" data-target="areaInput" title="Scan with camera">📷</button>
+      </div>
+      <div class="cam-inline" id="camPanel_areaInput">
+      <div class="cam-reader" id="camReader_areaInput"></div>
+      <div class="cam-bar"><span>Point at barcode/QR</span><button type="button" class="cam-close" data-cam-close="areaInput">&times;</button></div>
+      </div>
+      </div>
+      <div class="area-hint" id="areaHint">Scan Area QR First</div>
+
+      <div class="handover-box" id="handoverBox">
+        <div class="handover-card">
+          <div class="handover-label">Scan Handover Area QR</div>
+          <div style="font-size:12px; color:#888; text-align:center; margin-bottom:12px;">An ageing shipment was found — scan the handover area QR before continuing to scan.</div>
+          <div class="cam-input-wrap">
+<div class="input-row scan-target">
+            <input type="text" id="handoverInput" placeholder="Scan handover area QR here" inputmode="none"
+                   autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            <button type="button" class="cam-scan-btn" data-target="handoverInput" title="Scan with camera">📷</button>
+          </div>
+          <div class="cam-inline" id="camPanel_handoverInput">
+          <div class="cam-reader" id="camReader_handoverInput"></div>
+          <div class="cam-bar"><span>Point at barcode/QR</span><button type="button" class="cam-close" data-cam-close="handoverInput">&times;</button></div>
+          </div>
+          </div>
+          <div id="handoverResolvedName" style="display:none; margin-top:10px; font-size:14px; font-weight:700; color:#0f766e; text-align:center;"></div>
+          <div id="handoverNextHint" style="display:none; margin-top:4px; font-size:12px; color:#888; text-align:center;">Scan next AWB / Manifest</div>
+        </div>
+      </div>
+
+      <div class="label" style="margin-top:18px;">Scan AWB</div>
+      <div class="cam-input-wrap">
+<div class="input-row scan-target">
+        <input type="text" id="barcodeInput" placeholder="Enter AWB / Manifest / Seal number here" inputmode="none"
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <button type="button" class="cam-scan-btn" data-target="barcodeInput" title="Scan with camera">📷</button>
+      </div>
+      <div class="cam-inline" id="camPanel_barcodeInput">
+      <div class="cam-reader" id="camReader_barcodeInput"></div>
+      <div class="cam-bar"><span>Point at barcode/QR</span><button type="button" class="cam-close" data-cam-close="barcodeInput">&times;</button></div>
+      </div>
+      </div>
+
+      <div id="loadingBar">Data loading, please wait...</div>
+      <div id="lastFetchLabel" style="display:none; font-size:12px; color:#888; margin-top:4px;"></div>
+
+      <div class="result-card" id="resultCard">
+        <div class="rc-top">
+          <span class="rc-awb" id="rAwb">-</span>
+          <span class="rc-badge" id="rReportType">-</span>
+        </div>
+        <div class="rc-lastscan">Last Scanned: <span id="rLastScanned">-</span></div>
+        <div class="rc-bin-label">Primary Bin Number</div>
+        <div class="rc-bin-value" id="rPrimary">-</div>
+        <div class="rc-grid">
+          <div class="rc-cell"><div class="rc-cell-label">Secondary Bin</div><div class="rc-cell-value" id="rSecondary">-</div></div>
+          <div class="rc-cell"><div class="rc-cell-label">Ageing</div><div class="rc-cell-value" id="rAgeing">-</div></div>
+        </div>
+        <div class="rc-grid">
+          <div class="rc-cell"><div class="rc-cell-label">Shipment Type</div><div class="rc-cell-value" id="rShipmentType">-</div></div>
+          <div class="rc-cell"><div class="rc-cell-label">Pendency</div><div class="rc-cell-value" id="rPendency">-</div></div>
+        </div>
+      </div>
+
+      <div class="stats-card">
+        <div class="stats-row"><span class="k">Last Scan AWB</span><span class="v" id="sLastAwb">-</span></div>
+        <div class="stats-row"><span class="k">Found (Ageing &gt; 0)</span><span class="v found" id="sFound">0</span></div>
+        <div class="stats-row"><span class="k">Total Scan Count</span><span class="v total" id="sTotal">0</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="camScanOverlay" style="display:none;"></div>
+
+  <div id="exitConfirmOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:12px; padding:24px; max-width:300px; width:85%; text-align:center;">
+      <div style="font-size:17px; font-weight:700; margin-bottom:18px; color:#222;">Are you sure to exit this page?</div>
+      <div style="display:flex; gap:12px;">
+        <button id="exitConfirmYes" style="flex:1; padding:14px; border:none; border-radius:8px; background:#c62828; color:#fff; font-weight:700; font-size:16px;">YES</button>
+        <button id="exitConfirmNo" style="flex:1; padding:14px; border:none; border-radius:8px; background:#2563eb; color:#fff; font-weight:700; font-size:16px;">NO</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Supabase JS client -->
+  <!-- ================= TV VIEW (kiosk mode) =================
+       Opened via ?tv=BlockA or ?tv=BlockD in the URL -- a separate,
+       header-less full-screen view meant to be left running on a TV,
+       auto-cycling between Primary Scan Rate / Secondary Scan Rate /
+       Load Pending every 5 seconds, current-hour data only. Must be
+       declared before the main inline script tag below, since that
+       script calls tvInit() (which looks up #tvView) as soon as it runs. -->
+  <div id="tvView" style="display:none; position:fixed; inset:0; background:#0b1220; color:#fff; z-index:5000; overflow:hidden; font-family:'Segoe UI',Arial,sans-serif;">
+    <div style="padding:14px 24px; display:flex; justify-content:space-between; align-items:center; background:#111a2e; border-bottom:2px solid #22314f;">
+      <div style="font-size:26px; font-weight:800;" id="tvTitle">-</div>
+      <div style="font-size:18px; color:#9fb3d9;" id="tvClock">-</div>
+    </div>
+    <div id="tvBody" style="padding:16px 24px; height:calc(100vh - 66px); overflow:hidden;"></div>
+  </div>
+
+  <!-- Camera-based barcode/QR scanning (phone camera fallback for hardware scanners) -->
+  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+  <script>
+
+    // ================= CLOUDFLARE API =================
+    // Supabase has been removed. The dashboard talks to the Cloudflare
+    // Worker API, while large read-only snapshots (audit_master, pendency
+    // summary, load summary) are served from Workers KV and filtered in-browser.
+    const CF_API_BASE = window.CF_API_BASE || '/api';
+
+    function cfError(message, code) { const e = { message: message || 'Request failed' }; if (code) e.code = code; return e; }
+    function parseOr(expr) {
+      if (!expr) return [];
+      return String(expr).split(',').map(part => {
+        const m = part.match(/^([^\.]+)\.(eq|neq|gte|gt|lte|lt)\.(.*)$/);
+        if (!m) return null;
+        const opMap = {eq:'=',neq:'!=',gte:'>=',gt:'>',lte:'<=',lt:'<'};
+        return {column:m[1], op:opMap[m[2]], value:decodeURIComponent(m[3])};
+      }).filter(Boolean);
+    }
+
+    class CFQuery {
+      constructor(table) { this.table = table; this._select='*'; this._filters=[]; this._or=[]; this._order=null; this._limit=null; this._offset=0; this._action=null; this._values=null; this._single=false; }
+      select(v='*') { this._select=v; return this; }
+      eq(c,v){this._filters.push({column:c,op:'=',value:v});return this;}
+      neq(c,v){this._filters.push({column:c,op:'!=',value:v});return this;}
+      gt(c,v){this._filters.push({column:c,op:'>',value:v});return this;}
+      gte(c,v){this._filters.push({column:c,op:'>=',value:v});return this;}
+      lt(c,v){this._filters.push({column:c,op:'<',value:v});return this;}
+      lte(c,v){this._filters.push({column:c,op:'<=',value:v});return this;}
+      in(c,v){this._filters.push({column:c,op:'in',value:v});return this;}
+      or(v){this._or=parseOr(v);return this;}
+      order(c,o={}){this._order={column:c,ascending:o.ascending!==false};return this;}
+      range(a,b){this._offset=a;this._limit=b-a+1;return this;}
+      limit(n){this._limit=n;return this;}
+      single(){this._single=true;return this;}
+      insert(v){this._action='insert';this._values=v;return this;}
+      update(v){this._action='update';this._values=v;return this;}
+      delete(){this._action='delete';return this;}
+      then(resolve,reject){ return this.execute().then(resolve,reject); }
+      catch(reject){ return this.execute().catch(reject); }
+      async execute(){
+        if (this._action) {
+          const r=await fetch(CF_API_BASE+'/mutate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({table:this.table,action:this._action,values:this._values,filters:this._filters})});
+          let body={}; try{body=await r.json();}catch(e){}
+          if(!r.ok) return {data:null,error:cfError(body.error||'Mutation failed',body.code)};
+          return {data:body.data||[],error:null};
+        }
+        // Read-only KV-backed tables are cached in the browser. This is the
+        // key change that removes the huge repeated audit_master egress.
+        if (['audit_master','pendency_snapshot_summary','load_pending_summary','fwd_pendency_current','rev_pendency_current'].includes(this.table)) {
+          const cacheKey='cf:'+this.table;
+          let rows=CFLocalCache[cacheKey];
+          const cacheFresh = rows && (Date.now() - (CFLocalCacheAt[cacheKey] || 0) < CF_SNAPSHOT_TTL_MS);
+          if (!cacheFresh) {
+            const objMap={audit_master:'audit_master.json.gz',pendency_snapshot_summary:'pendency_snapshot_summary.json.gz',load_pending_summary:'load_pending_summary.json.gz',fwd_pendency_current:'fwd_pendency_current.json.gz',rev_pendency_current:'rev_pendency_current.json.gz'};
+            try { const r=await fetch((window.CF_DATA_BASE||'/data')+'/'+objMap[this.table],{cache:'no-cache'}); if(!r.ok) throw new Error('Data unavailable'); rows=await r.json(); CFLocalCache[cacheKey]=Array.isArray(rows)?rows:[]; CFLocalCacheAt[cacheKey]=Date.now(); }
+            catch(e){ return {data:null,error:cfError(e.message)}; }
+          }
+          rows=rows.filter(row=>this._filters.every(f=>{const a=row[f.column],b=f.value; if(f.op==='in')return b.includes(a); if(f.op==='=')return a==b; if(f.op==='!=')return a!=b; if(f.op==='>')return a>b; if(f.op==='>=')return a>=b; if(f.op==='<')return a<b; if(f.op==='<=')return a<=b; return true;}));
+          if(this._or.length) rows=rows.filter(row=>this._or.some(f=>{const a=row[f.column],b=f.value;return f.op==='='?a==b:f.op==='!='?a!=b:f.op==='> '?a>b:false;}));
+          if(this._order) rows.sort((a,b)=>{const av=a[this._order.column],bv=b[this._order.column]; if(av===bv)return 0; const x=av==null?1:bv==null?-1:(av>bv?1:-1); return this._order.ascending?x:-x;});
+          const selected=this._select==='*'?rows:rows.map(row=>{const o={};this._select.split(',').map(x=>x.trim()).forEach(k=>o[k]=row[k]);return o;});
+          const sliced=this._limit==null?selected.slice(this._offset):selected.slice(this._offset,this._offset+this._limit);
+          return {data:this._single?(sliced[0]||null):sliced,error:this._single&&!sliced.length?cfError('No rows'):null};
+        }
+        try {
+          const r=await fetch(CF_API_BASE+'/query',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({table:this.table,select:this._select,filters:this._filters,or:this._or,order:this._order,limit:this._limit||5000,offset:this._offset})});
+          let body={};try{body=await r.json();}catch(e){}
+          if(!r.ok)return {data:null,error:cfError(body.error||'Query failed')};
+          const data=body.data||[]; return {data:this._single?(data[0]||null):data,error:this._single&&!data.length?cfError('No rows'):null};
+        } catch(e){return {data:null,error:cfError(e.message)};}
+      }
+    }
+    const CFLocalCache = {};
+    const CFLocalCacheAt = {};
+    const CF_SNAPSHOT_TTL_MS = 15 * 60 * 1000;
+    const supabaseClient = { from: table => new CFQuery(table) };
+    async function supabaseQueryWithRetry(buildQuery, retries) {
+      retries = retries == null ? 2 : retries;
+      let last=null;
+      for(let i=0;i<=retries;i++) { const r=await buildQuery().execute(); if(!r.error)return r; last=r; if(i<retries) await new Promise(res=>setTimeout(res,500*(i+1))); }
+      return last;
+    }
+
+
+    // ================= LOGIN =================
+
+    const EMP_PASSWORDS = {
+      "BLOCK A_1": "1", "BLOCK A_2": "1",
+      "BLOCK D_1": "1", "BLOCK D_2": "1",
+      "BLOCK B_1": "1", "BLOCK B_2": "1"
+    };
+
+    let currentEmp = null;
+    let loginMode = 'emp';
+
+    const screenLogin = document.getElementById('screenLogin');
+    const screenFloorAudit = document.getElementById('screenFloorAudit');
+    const screenPassword = document.getElementById('screenPassword');
+    const screenScan = document.getElementById('screenScan');
+    const screenResetConfirm = document.getElementById('screenResetConfirm');
+    const passTitle = document.getElementById('passTitle');
+    const passwordInput = document.getElementById('passwordInput');
+    const passError = document.getElementById('passError');
+
+    document.querySelectorAll('.emp-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        loginMode = 'emp';
+        currentEmp = btn.getAttribute('data-emp');
+        passTitle.innerText = currentEmp + ' — Enter Password';
+        passwordInput.value = '';
+        passError.style.display = 'none';
+        screenFloorAudit.style.display = 'none';
+        screenPassword.style.display = 'flex';
+        passwordInput.focus();
+      });
+    });
+
+    document.getElementById('openFloorAuditBtn').addEventListener('click', function() {
+      screenLogin.style.display = 'none';
+      screenFloorAudit.style.display = 'flex';
+    });
+
+    document.getElementById('floorAuditBack').addEventListener('click', function() {
+      screenFloorAudit.style.display = 'none';
+      screenLogin.style.display = 'flex';
+    });
+
+    document.getElementById('backToSelect').addEventListener('click', function() {
+      screenPassword.style.display = 'none';
+      // Reset was launched straight from the Hub, not from Floor Audit --
+      // send it back to whichever screen it actually came from.
+      if (loginMode === 'reset') {
+        screenLogin.style.display = 'flex';
+      } else {
+        screenFloorAudit.style.display = 'flex';
+      }
+      currentEmp = null;
+      loginMode = 'emp';
+    });
+
+    function attemptLogin() {
+      if (loginMode === 'reset') {
+        if (passwordInput.value === 'clear') {
+          screenPassword.style.display = 'none';
+          screenResetConfirm.style.display = 'block';
+        } else {
+          passError.style.display = 'block';
+          passwordInput.value = '';
+        }
+        return;
+      }
+
+      if (passwordInput.value === EMP_PASSWORDS[currentEmp]) {
+        screenPassword.style.display = 'none';
+        screenFloorAudit.style.display = 'none';
+        screenLogin.style.display = 'none';
+        screenScan.style.display = 'block';
+        document.getElementById('scanHeaderTitle').innerText = 'Scan & Sort — ' + currentEmp;
+        history.pushState({ scanScreen: true }, '');
+        loadSheetData();
+        setTimeout(function() { areaInput.focus(); }, 100);
+      } else {
+        passError.style.display = 'block';
+        passwordInput.value = '';
+      }
+    }
+
+    document.getElementById('passSubmitBtn').addEventListener('click', attemptLogin);
+    passwordInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') attemptLogin();
+    });
+
+
+    // ================= LIVE DASHBOARD =================
+
+    const screenDashboard = document.getElementById('screenDashboard');
+    const dashUpdated = document.getElementById('dashUpdated');
+    let dashInterval = null;
+
+    document.getElementById('openDashboardBtn').addEventListener('click', function() {
+      screenLogin.style.display = 'none';
+      screenDashboard.style.display = 'block';
+      renderAuditFilters();
+      refreshDashboard();
+      dashInterval = setInterval(refreshDashboard, 3000);
+    });
+
+    document.getElementById('dashBack').addEventListener('click', function() {
+      screenDashboard.style.display = 'none';
+      screenLogin.style.display = 'flex';
+      if (dashInterval) { clearInterval(dashInterval); dashInterval = null; }
+    });
+
+    // Ageing buckets an "audit report" actually cares about -- 0_day is a
+    // clean scan (nothing wrong), so unlike AGING_ORDER this deliberately
+    // starts at 1_day and adds a NOT FOUND column at the front, matching
+    // how the floor wants this report read.
+    const REPORT_AGEING_COLS = ['0_day', '1_day', '2_day', '3_day', '4_day', '5_day', '6_day', '6+_day'];
+
+    function reportAgeingLabel(a) {
+      return a.replace('_day', ' DAY').toUpperCase();
+    }
+
+    function reportAgeingKey(scan) {
+      const v = String(scan.ageing || '').trim();
+      // NOT FOUND scans are excluded from this pivot entirely -- returns
+      // null so the caller can filter them out, rather than lumping them
+      // into a fake ageing bucket.
+      if (!v || v.toLowerCase() === 'not found') return null;
+      return v;
+    }
+
+    const SCAN_CSV_COLUMNS = [
+      ['AWB', 'awb_number'], ['Employee', 'emp'], ['Emp Name', 'emp_name'], ['Scanned Area', 'scanned_area'],
+      ['Ageing', 'ageing'], ['Status', 'status'], ['Pendency', 'pendency'], ['Last Destination', 'last_destination'],
+      ['Primary Bin', 'primary_bin'], ['Secondary Bin', 'secondary_bin'], ['Blocks', 'blocks'],
+      ['Layout', 'layout_name'], ['Action User', 'action_user'], ['Bin Level', 'bin_level'], ['Bin Name', 'bin_name'],
+      ['Client', 'client_name'], ['Shipment Type', 'shipment_type'], ['Report Type', 'report_type'], ['Scanned At', 'scanned_at']
+    ];
+
+    function downloadScanRows(rows, filename) {
+      const lines = [SCAN_CSV_COLUMNS.map(c => csvCell(c[0])).join(',')];
+      rows.forEach(function(row) {
+        lines.push(SCAN_CSV_COLUMNS.map(c => csvCell(row[c[1]])).join(','));
+      });
+      const csv = '\ufeff' + lines.join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function() { URL.revokeObjectURL(url); a.remove(); }, 30000);
+    }
+
+    let latestScansForDownload = [];
+
+    function scanDownloadHandler(groupKey, groupValue, ageing) {
+      const encoded = encodeURIComponent(JSON.stringify({ groupKey: groupKey, groupValue: groupValue, ageing: ageing }));
+      return "downloadScanMatrixCell('" + encoded + "')";
+    }
+
+    window.downloadScanMatrixCell = function(encoded) {
+      const filter = JSON.parse(decodeURIComponent(encoded));
+      const rows = latestScansForDownload.filter(function(r) {
+        const matchesGroup = filter.groupValue === '__ALL__' || String(r[filter.groupKey] || 'Unknown') === filter.groupValue;
+        // '__ALL__' still excludes NOT FOUND scans, matching what the
+        // displayed GRAND TOTAL actually counts.
+        const matchesAgeing = filter.ageing === '__ALL__' ? reportAgeingKey(r) !== null : reportAgeingKey(r) === filter.ageing;
+        return matchesGroup && matchesAgeing;
+      });
+      if (!rows.length) { alert('No scans found for this selection.'); return; }
+      const safeName = (filter.groupValue + '_' + filter.ageing).replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '').slice(0, 80);
+      downloadScanRows(rows, 'audit_' + safeName + '.csv');
+    };
+
+    const AUDIT_CATEGORIES = ['CLIENT Warehouse', 'At Dock', 'BRSNR', 'Received at DC'];
+    let dashFilterAging = REPORT_AGEING_COLS.slice();
+    let dashFilterCategories = AUDIT_CATEGORIES.slice();
+    let lastScansForFilter = [];
+
+    let auditAgeingDropdownOpen = false;
+
+    function renderAuditFilters() {
+      const container = document.getElementById('auditFilters');
+      let html = '<div style="position:relative; display:inline-block; margin-bottom:8px;">';
+      html += '<button id="ageingDropdownBtn" class="pend-btn" style="padding:6px 12px;font-size:12px;">Ageing Filter (' + dashFilterAging.length + '/' + REPORT_AGEING_COLS.length + ') &#9662;</button>';
+      html += '<div id="ageingDropdownPanel" style="display:' + (auditAgeingDropdownOpen ? 'block' : 'none') + '; position:absolute; top:100%; left:0; background:#fff; border:1px solid #ccc; border-radius:8px; padding:10px; z-index:50; min-width:170px; box-shadow:0 4px 12px rgba(0,0,0,0.18);">';
+      REPORT_AGEING_COLS.forEach(function(a) {
+        const on = dashFilterAging.includes(a);
+        html += '<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0;cursor:pointer;">' +
+          '<input type="checkbox" data-dash-aging="' + a + '"' + (on ? ' checked' : '') + '> ' + reportAgeingLabel(a) + '</label>';
+      });
+      html += '</div></div>';
+
+      html += '<div style="font-size:11px;color:#666;font-weight:700;margin:6px 0 4px;">CATEGORY</div><div style="display:flex;flex-wrap:wrap;gap:6px;">';
+      AUDIT_CATEGORIES.forEach(function(c) {
+        const on = dashFilterCategories.includes(c);
+        html += '<button class="pend-btn' + (on ? ' active' : '') + '" style="padding:4px 10px;font-size:11px;" data-dash-cat="' + encodeURIComponent(c) + '">' + escapeHtml(c) + '</button>';
+      });
+      html += '</div>';
+      container.innerHTML = html;
+    }
+
+    document.getElementById('auditFilters').addEventListener('click', function(e) {
+      const dropdownBtn = e.target.closest('#ageingDropdownBtn');
+      if (dropdownBtn) {
+        auditAgeingDropdownOpen = !auditAgeingDropdownOpen;
+        document.getElementById('ageingDropdownPanel').style.display = auditAgeingDropdownOpen ? 'block' : 'none';
+        return;
+      }
+      const catBtn = e.target.closest('button[data-dash-cat]');
+      if (catBtn) {
+        const c = decodeURIComponent(catBtn.dataset.dashCat);
+        if (dashFilterCategories.includes(c)) dashFilterCategories = dashFilterCategories.filter(x => x !== c);
+        else dashFilterCategories.push(c);
+        // Toggle just this button's own state instead of rebuilding the
+        // whole filter panel -- rebuilding mid-click was what caused the
+        // "jumping" (the checkbox/button DOM nodes were being replaced
+        // while still mid-interaction).
+        catBtn.classList.toggle('active', dashFilterCategories.includes(c));
+        renderAgeingMatrix('ageingMatrixByEmp', lastScansForFilter, 'emp', 'Employee');
+        return;
+      }
+    });
+
+    document.getElementById('auditFilters').addEventListener('change', function(e) {
+      const cb = e.target.closest('input[data-dash-aging]');
+      if (!cb) return;
+      const a = cb.dataset.dashAging;
+      // Rebuild from the canonical order rather than push()-ing onto the
+      // end -- otherwise re-selecting a bucket moves its column to the
+      // end of the table instead of back to its natural position.
+      if (cb.checked) { if (!dashFilterAging.includes(a)) dashFilterAging = REPORT_AGEING_COLS.filter(x => dashFilterAging.includes(x) || x === a); }
+      else { dashFilterAging = dashFilterAging.filter(x => x !== a); }
+      // Only update the button's count label -- never rebuild the
+      // checkbox panel itself while a checkbox inside it is mid-toggle.
+      const dropdownBtnEl = document.getElementById('ageingDropdownBtn');
+      if (dropdownBtnEl) dropdownBtnEl.innerHTML = 'Ageing Filter (' + dashFilterAging.length + '/' + REPORT_AGEING_COLS.length + ') &#9662;';
+      renderAgeingMatrix('ageingMatrixByEmp', lastScansForFilter, 'emp', 'Employee');
+    });
+
+    // Close the dropdown when tapping/clicking anywhere outside it.
+    document.addEventListener('click', function(e) {
+      if (!auditAgeingDropdownOpen) return;
+      const panel = document.getElementById('ageingDropdownPanel');
+      const btn = document.getElementById('ageingDropdownBtn');
+      if (panel && !panel.contains(e.target) && e.target !== btn) {
+        auditAgeingDropdownOpen = false;
+        panel.style.display = 'none';
+      }
+    });
+
+    function renderAgeingMatrix(containerId, scans, groupKey, groupLabel) {
+      if (containerId === 'ageingMatrixByEmp') lastScansForFilter = scans;
+      const filteredScans = scans.filter(function(r) {
+        return dashFilterCategories.includes(r.pendency || '') && dashFilterAging.includes(reportAgeingKey(r));
+      });
+      const groups = {};
+      filteredScans.forEach(function(r) {
+        const g = String(r[groupKey] || 'Unknown').trim() || 'Unknown';
+        if (!groups[g]) groups[g] = {};
+        const k = reportAgeingKey(r);
+        groups[g][k] = (groups[g][k] || 0) + 1;
+      });
+
+      const groupNames = Object.keys(groups).sort();
+      const colTotals = {};
+      const agingCols = dashFilterAging.length ? dashFilterAging : REPORT_AGEING_COLS;
+      agingCols.forEach(c => colTotals[c] = 0);
+      let grandTotal = 0;
+
+      let html = '<table class="pend-table"><thead><tr><th>' + groupLabel + '</th>';
+      agingCols.forEach(c => { html += '<th>' + reportAgeingLabel(c) + '</th>'; });
+      html += '<th>GRAND TOTAL</th></tr></thead><tbody>';
+
+      groupNames.forEach(function(g) {
+        let rowTotal = 0;
+        html += '<tr><td>' + escapeHtml(g) + '</td>';
+        agingCols.forEach(function(c) {
+          const v = groups[g][c] || 0;
+          rowTotal += v;
+          colTotals[c] += v;
+          html += '<td>' + makeScanCountButton(v, groupKey, g, c) + '</td>';
+        });
+        grandTotal += rowTotal;
+        html += '<td class="pend-total-col">' + makeScanCountButton(rowTotal, groupKey, g, '__ALL__') + '</td></tr>';
+      });
+
+      if (!groupNames.length) {
+        html += '<tr><td colspan="' + (agingCols.length + 2) + '" style="color:#999;text-align:center;">No scan records yet</td></tr>';
+      }
+
+      html += '<tr class="pend-total-row"><td>GRAND TOTAL</td>';
+      agingCols.forEach(function(c) {
+        html += '<td>' + makeScanCountButton(colTotals[c], groupKey, '__ALL__', c) + '</td>';
+      });
+      html += '<td class="pend-total-col">' + makeScanCountButton(grandTotal, groupKey, '__ALL__', '__ALL__') + '</td></tr>';
+      html += '</tbody></table>';
+
+      document.getElementById(containerId).innerHTML = html;
+    }
+
+    function makeScanCountButton(count, groupKey, groupValue, ageing) {
+      if (!count) return '<span class="pend-count-btn" style="color:#aaa;cursor:default;">0</span>';
+      return '<button class="pend-count-btn" onclick="' + scanDownloadHandler(groupKey, groupValue, ageing) + '">' +
+        Number(count).toLocaleString() + '</button>';
+    }
+
+    function parseIstHourMinute(val) {
+      // occurred_at is stored as plain IST wall-clock text -- parse the
+      // hour/minute directly instead of going through new Date(), which
+      // could interpret this non-ISO string using the browser/device's
+      // own local timezone rather than the actual IST value it holds.
+      const m = String(val).match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+      if (!m) return null;
+      return { hours: parseInt(m[4], 10), minutes: parseInt(m[5], 10) };
+    }
+
+    function getShiftDayStartIso() {
+      // Audit Reports resets at 9:00 AM IST -- before that time, we're
+      // still counting the shift that started the PREVIOUS day at 9 AM.
+      const now = new Date();
+      const istNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+      const boundary = new Date(istNow.getFullYear(), istNow.getMonth(), istNow.getDate(), 9, 0, 0);
+      if (istNow < boundary) boundary.setDate(boundary.getDate() - 1);
+      // Convert that IST boundary back to the equivalent real UTC instant
+      // (scanned_at is a true timestamptz, unlike item_last_updated).
+      const boundaryUtc = new Date(boundary.getTime() - (istNow.getTime() - now.getTime()));
+      return boundaryUtc.toISOString();
+    }
+
+    let dashboardScans = null;
+    let dashboardLastFetchedAt = null;
+
+    async function refreshDashboard() {
+      const PAGE_SIZE = 5000;
+      const shiftDayStart = getShiftDayStartIso();
+      let fetched = [];
+      let page = 0;
+      const incremental = Array.isArray(dashboardScans) && dashboardLastFetchedAt;
+
+      while (true) {
+        const from = page * PAGE_SIZE;
+        const q = supabaseClient.from('audit_scans')
+          .select('awb_number, emp, emp_name, scanned_area, status, ageing, pendency, last_destination, primary_bin, secondary_bin, blocks, layout_name, action_user, bin_level, bin_name, client_name, shipment_type, report_type, scanned_at')
+          .gte('scanned_at', incremental ? dashboardLastFetchedAt : shiftDayStart)
+          .order('scanned_at', {ascending:true})
+          .range(from, from + PAGE_SIZE - 1);
+        const { data, error } = await supabaseQueryWithRetry(function() { return q; });
+        if (error) {
+          dashUpdated.innerText = 'Update fail: ' + error.message;
+          return;
+        }
+        fetched = fetched.concat(data || []);
+        if (!data || data.length < PAGE_SIZE) break;
+        page++;
+      }
+
+      if (!incremental) {
+        dashboardScans = fetched;
+      } else if (fetched.length) {
+        // audit_scans is unique per employee+AWB. Replace an existing row if
+        // it reappears, otherwise append it. This makes the 3-second live view
+        // incremental instead of downloading the entire shift repeatedly.
+        const byKey = new Map((dashboardScans || []).map(r => [String(r.emp||'')+'|'+String(r.awb_number||''), r]));
+        fetched.forEach(r => byKey.set(String(r.emp||'')+'|'+String(r.awb_number||''), r));
+        dashboardScans = Array.from(byKey.values()).filter(r => !r.scanned_at || r.scanned_at >= shiftDayStart);
+      }
+
+      latestScansForDownload = dashboardScans || [];
+      try {
+        renderAgeingMatrix('ageingMatrixByEmp', dashboardScans || [], 'emp', 'Employee');
+      } catch (e) {
+        console.error('Ageing matrix render failed:', e);
+        document.getElementById('ageingMatrixByEmp').innerHTML = '<p style="color:#c62828;">Failed to render: ' + escapeHtml(e.message) + '</p>';
+      }
+
+      let latestScanAt = null;
+      (dashboardScans || []).forEach(function(r) {
+        if (r.scanned_at && (!latestScanAt || r.scanned_at > latestScanAt)) latestScanAt = r.scanned_at;
+      });
+      if (fetched.length) {
+        fetched.forEach(function(r) { if (r.scanned_at && (!dashboardLastFetchedAt || r.scanned_at > dashboardLastFetchedAt)) dashboardLastFetchedAt = r.scanned_at; });
+      }
+      if (!dashboardLastFetchedAt) dashboardLastFetchedAt = latestScanAt || new Date().toISOString();
+
+      if (latestScanAt) {
+        const d = new Date(latestScanAt);
+        dashUpdated.innerText = 'Data as of: ' + d.toLocaleString('en-IN', {timeZone:'Asia/Kolkata',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}) + ' IST';
+      } else {
+        dashUpdated.innerText = 'No scan data yet.';
+      }
+    }
+
+
+    // ================= LIVE PENDENCY DASHBOARD =================
+
+    const screenPendency = document.getElementById('screenPendency');
+    const pendencyTables = document.getElementById('pendencyTables');
+    const pendencyUpdated = document.getElementById('pendencyUpdated');
+    let pendencyInterval = null;
+
+    const AGING_ORDER = ['0_day', '1_day', '2_day', '3_day', '4_day', '5_day', '6_day', '6+_day'];
+    const PENDENCY_CATEGORIES = ['CLIENT Warehouse', 'IN BAG / At Dock', 'IN BAG / BRSNR', 'NOT IN BAG / Received at DC'];
+    let pendencyFilterAging = AGING_ORDER.slice();
+    let pendencyFilterCategories = PENDENCY_CATEGORIES.slice();
+
+    function renderPendencyFilters() {
+      const container = document.getElementById('pendencyFilters');
+      let html = '<div style="font-size:11px;color:#666;font-weight:700;margin-bottom:4px;">AGEING</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">';
+      AGING_ORDER.forEach(function(a) {
+        const on = pendencyFilterAging.includes(a);
+        html += '<button class="pend-btn' + (on ? ' active' : '') + '" style="padding:4px 10px;font-size:11px;" data-pend-aging="' + a + '">' + agingLabel(a) + '</button>';
+      });
+      html += '</div><div style="font-size:11px;color:#666;font-weight:700;margin-bottom:4px;">CATEGORY</div><div style="display:flex;flex-wrap:wrap;gap:6px;">';
+      PENDENCY_CATEGORIES.forEach(function(c) {
+        const on = pendencyFilterCategories.includes(c);
+        html += '<button class="pend-btn' + (on ? ' active' : '') + '" style="padding:4px 10px;font-size:11px;" data-pend-cat="' + encodeURIComponent(c) + '">' + escapeHtml(c) + '</button>';
+      });
+      html += '</div>';
+      container.innerHTML = html;
+    }
+
+    document.getElementById('pendencyFilters').addEventListener('click', function(e) {
+      const agingBtn = e.target.closest('button[data-pend-aging]');
+      if (agingBtn) {
+        const a = agingBtn.dataset.pendAging;
+        if (pendencyFilterAging.includes(a)) pendencyFilterAging = pendencyFilterAging.filter(x => x !== a);
+        // Rebuild from the canonical order so a re-selected bucket returns
+        // to its natural column position instead of jumping to the end.
+        else pendencyFilterAging = AGING_ORDER.filter(x => pendencyFilterAging.includes(x) || x === a);
+        renderPendencyFilters();
+        if (lastPendencySummaryData) renderPendencyTables(lastPendencySummaryData, lastRenderedCapturedAt);
+        return;
+      }
+      const catBtn = e.target.closest('button[data-pend-cat]');
+      if (catBtn) {
+        const c = decodeURIComponent(catBtn.dataset.pendCat);
+        if (pendencyFilterCategories.includes(c)) pendencyFilterCategories = pendencyFilterCategories.filter(x => x !== c);
+        else pendencyFilterCategories.push(c);
+        renderPendencyFilters();
+        if (lastPendencySummaryData) renderPendencyTables(lastPendencySummaryData, lastRenderedCapturedAt);
+        return;
+      }
+    });
+
+    document.getElementById('openPendencyBtn').addEventListener('click', function() {
+      screenLogin.style.display = 'none';
+      screenPendency.style.display = 'block';
+      refreshPendency(true);
+      pendencyInterval = setInterval(function() { refreshPendency(false); }, 30000);
+    });
+
+    document.getElementById('pendencyBack').addEventListener('click', function() {
+      screenPendency.style.display = 'none';
+      screenLogin.style.display = 'flex';
+      if (pendencyInterval) { clearInterval(pendencyInterval); pendencyInterval = null; }
+    });
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function normalizePendencyCategory(category) {
+      return String(category || '')
+        .replace('NOT IN BAG / ', '')
+        .replace('IN BAG / ', '');
+    }
+
+    function agingLabel(aging) {
+      return String(aging || '')
+        .replace('_day', ' DAY')
+        .toUpperCase();
+    }
+
+    // ---- Drill-down caching ----
+    // Every level (category -> block -> destination -> shipment type) is a
+    // narrower slice of the SAME category's audit_master rows. Fetching
+    // audit_master again for every click was the main reason drill-down
+    // felt slow -- now each category (or, for the grand-total row, each
+    // whole report_type) is fetched from Supabase exactly once and then
+    // filtered in memory for every deeper level and every download.
+    const categoryCache = {};
+    const categoryCachePromise = {};
+    const reportCache = {};
+    const reportCachePromise = {};
+
+    async function getCategoryRows(reportType, pendencyType) {
+      const key = reportType + '|' + pendencyType;
+      if (categoryCache[key]) return categoryCache[key];
+      if (!categoryCachePromise[key]) {
+        categoryCachePromise[key] = fetchAuditRows({ report_type: reportType, pendency_type: pendencyType })
+          .then(function(rows) { categoryCache[key] = rows; delete categoryCachePromise[key]; return rows; })
+          .catch(function(e) { delete categoryCachePromise[key]; throw e; });
+      }
+      return categoryCachePromise[key];
+    }
+
+    async function getReportRows(reportType) {
+      if (reportCache[reportType]) return reportCache[reportType];
+      if (!reportCachePromise[reportType]) {
+        reportCachePromise[reportType] = fetchAuditRows({ report_type: reportType })
+          .then(function(rows) { reportCache[reportType] = rows; delete reportCachePromise[reportType]; return rows; })
+          .catch(function(e) { delete reportCachePromise[reportType]; throw e; });
+      }
+      return reportCachePromise[reportType];
+    }
+
+    function clearPendencyCaches() {
+      Object.keys(categoryCache).forEach(function(k) { delete categoryCache[k]; });
+      Object.keys(reportCache).forEach(function(k) { delete reportCache[k]; });
+    }
+
+    function makeCountButton(count, filters, title) {
+      const disabled = !count;
+      const encoded = encodeURIComponent(JSON.stringify(filters));
+      return '<button class="pend-count-btn" ' +
+        (disabled ? 'disabled' : '') +
+        (disabled ? '' : ' onclick="downloadPendencyData(\'' + encoded + '\', \'' + escapeHtml(title).replace(/'/g, '&#039;') + '\')"') +
+        '>' + Number(count || 0).toLocaleString() + '</button>';
+    }
+
+    function buildDrillTable(reportType, category, blocks) {
+      const blockNames = Object.keys(blocks).sort();
+      let html = '<div class="pend-drill-wrap">';
+      html += '<table class="pend-drill-table"><thead><tr><th>Block</th>';
+      AGING_ORDER.forEach(a => { html += '<th>' + agingLabel(a) + '</th>'; });
+      html += '<th>TOTAL</th></tr></thead><tbody>';
+
+      blockNames.forEach(function(block) {
+        const id = 'pend-block-' + Math.random().toString(36).slice(2);
+        const vals = blocks[block];
+        let total = 0;
+        AGING_ORDER.forEach(a => total += vals[a] || 0);
+
+        html += '<tr><td>' +
+          '<button class="pend-expand-btn" data-block-id="' + id + '" ' +
+          'onclick="toggleBlockDestinations(this, \'' + encodeURIComponent(reportType) + '\', \'' +
+          encodeURIComponent(category) + '\', \'' + encodeURIComponent(block) + '\', \'' + id + '\')">' +
+          '<span class="pend-arrow">▶</span>' + escapeHtml(block) + '</button></td>';
+
+        AGING_ORDER.forEach(a => {
+          html += '<td>' + makeCountButton(vals[a] || 0, {
+            report_type: reportType,
+            pendency_type: normalizePendencyCategory(category),
+            aging_bucket: a,
+            blocks: block
+          }, reportType + ' / ' + category + ' / ' + block + ' / ' + agingLabel(a)) + '</td>';
+        });
+        html += '<td>' + makeCountButton(total, {
+          report_type: reportType,
+          pendency_type: normalizePendencyCategory(category),
+          blocks: block
+        }, reportType + ' / ' + category + ' / ' + block) + '</td></tr>';
+        html += '<tr id="' + id + '" class="pend-destination-row" style="display:none;"><td colspan="10"></td></tr>';
+      });
+
+      if (!blockNames.length) {
+        html += '<tr><td colspan="10" style="color:#999;">No block data found.</td></tr>';
+      }
+      html += '</tbody></table>';
+      html += '<div class="pend-download-note">Click any blue count to download the matching AWB data.</div>';
+      html += '</div>';
+      return html;
+    }
+
+    async function fetchAuditRows(filters) {
+      const PAGE_SIZE = 1000;
+      let page = 0;
+      let rows = [];
+
+      while (true) {
+        let q = supabaseClient
+          .from('audit_master')
+          .select('awb_number, aging_bucket, pendency_type, last_destination, blocks, primary_bin, secondary_bin, item_last_updated, layout_name, action_user, emp_name, bin_level, bin_name, client_name, shipment_type, report_type, manifest_code, seal_number, item_destination_name, captured_at');
+
+        Object.keys(filters || {}).forEach(function(key) {
+          const value = filters[key];
+          if (value !== undefined && value !== null && value !== '') {
+            q = q.eq(key, value);
+          }
+        });
+
+        const from = page * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+        const { data, error } = await q.range(from, to);
+        if (error) throw error;
+        rows = rows.concat(data || []);
+        if (!data || data.length < PAGE_SIZE) break;
+        page++;
+      }
+      return rows;
+    }
+
+    function csvCell(value) {
+      const s = value == null ? '' : String(value);
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+
+    function downloadCsv(rows, filename) {
+      const columns = [
+        ['AWB', 'awb_number'],
+        ['Report Type', 'report_type'],
+        ['Pendency', 'pendency_type'],
+        ['Ageing', 'aging_bucket'],
+        ['Block', 'blocks'],
+        ['Last Destination', 'last_destination'],
+        ['Primary Bin', 'primary_bin'],
+        ['Secondary Bin', 'secondary_bin'],
+        ['Manifest Code', 'manifest_code'],
+        ['Seal Number', 'seal_number'],
+        ['Item Destination', 'item_destination_name'],
+        ['Item Last Updated', 'item_last_updated'],
+        ['Layout', 'layout_name'],
+        ['Action User', 'action_user'],
+        ['Employee', 'emp_name'],
+        ['Bin Level', 'bin_level'],
+        ['Bin Name', 'bin_name'],
+        ['Client', 'client_name'],
+        ['Shipment Type', 'shipment_type']
+      ];
+
+      const lines = [columns.map(c => csvCell(c[0])).join(',')];
+      rows.forEach(function(row) {
+        lines.push(columns.map(c => csvCell(row[c[1]])).join(','));
+      });
+
+      const csv = '\ufeff' + lines.join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+
+      // The Supabase query is async, so the original user-click activation
+      // may be gone by the time we reach this point. A real hidden anchor
+      // is more reliable than window.open/location for CSV downloads.
+      a.click();
+
+      // Keep the object URL alive long enough for Chrome/Edge to start the
+      // download before releasing it.
+      setTimeout(function() {
+        URL.revokeObjectURL(url);
+        a.remove();
+      }, 30000);
+    }
+
+    async function downloadPendencyData(encodedFilters, title) {
+      const safeTitle = String(title || 'pendency')
+        .replace(/[^a-z0-9]+/gi, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 80);
+      try {
+        const filters = JSON.parse(decodeURIComponent(encodedFilters));
+        // pendency_type present -> this count lives inside one category, so
+        // the cached category slice already covers it. No pendency_type ->
+        // this is a report-wide (grand total row) count, needs all
+        // categories for that report_type.
+        const baseRows = filters.pendency_type
+          ? await getCategoryRows(filters.report_type, filters.pendency_type)
+          : await getReportRows(filters.report_type);
+
+        const skipKeys = ['report_type', 'pendency_type'];
+        const rows = baseRows.filter(function(r) {
+          const matchesExplicit = Object.keys(filters).every(function(k) {
+            if (skipKeys.indexOf(k) !== -1) return true;
+            return String(r[k] || '') === String(filters[k] || '');
+          });
+          if (!matchesExplicit) return false;
+          // A TOTAL-style download (no specific aging_bucket in the
+          // filter) must still respect whichever ageing buckets are
+          // currently selected in the filter panel -- otherwise it
+          // downloads 0-day and every other bucket regardless of what's
+          // deselected, even though the on-screen TOTAL only counts the
+          // selected ones.
+          if (!('aging_bucket' in filters)) {
+            return pendencyFilterAging.includes(r.aging_bucket);
+          }
+          return true;
+        });
+
+        if (!rows.length) {
+          alert('No AWB data found for this selection.');
+          return;
+        }
+        downloadCsv(rows, safeTitle + '.csv');
+      } catch (e) {
+        console.error('Pendency download error:', e);
+        alert('Download failed: ' + (e && e.message ? e.message : e));
+      }
+    }
+
+    async function toggleBlockDestinations(button, reportTypeEncoded, categoryEncoded, blockEncoded, rowId) {
+      const row = document.getElementById(rowId);
+      const arrow = button.querySelector('.pend-arrow');
+      if (!row) return;
+
+      if (row.style.display !== 'none') {
+        row.style.display = 'none';
+        arrow.classList.remove('open');
+        return;
+      }
+
+      row.style.display = 'table-row';
+      arrow.classList.add('open');
+      const cell = row.querySelector('td');
+      cell.innerHTML = '<div class="pend-drill-wrap" style="color:#888;">Loading last destinations...</div>';
+
+      const reportType = decodeURIComponent(reportTypeEncoded);
+      const category = decodeURIComponent(categoryEncoded);
+      const block = decodeURIComponent(blockEncoded);
+
+      try {
+        const allRows = await getCategoryRows(reportType, normalizePendencyCategory(category));
+        const rows = allRows.filter(function(r) { return String(r.blocks || 'Unknown').trim() === block; });
+
+        const destMap = {};
+        rows.forEach(function(r) {
+          const dest = String(r.last_destination || 'Unknown').trim() || 'Unknown';
+          if (!destMap[dest]) destMap[dest] = {};
+          if (!destMap[dest][r.aging_bucket]) destMap[dest][r.aging_bucket] = 0;
+          destMap[dest][r.aging_bucket]++;
+        });
+
+        const destinations = Object.keys(destMap).sort();
+        let html = '<div class="pend-drill-wrap"><table class="pend-drill-table"><thead><tr><th>Last Destination</th>';
+        AGING_ORDER.forEach(a => { html += '<th>' + agingLabel(a) + '</th>'; });
+        html += '<th>TOTAL</th></tr></thead><tbody>';
+
+        destinations.forEach(function(dest) {
+          let total = 0;
+          AGING_ORDER.forEach(a => total += destMap[dest][a] || 0);
+
+          const destId = 'pend-dest-' + Math.random().toString(36).slice(2);
+
+          html += '<tr><td>' +
+            '<button class="pend-expand-btn" onclick="toggleDestinationShipmentTypes(this, \''
+            + encodeURIComponent(reportType) + '\', \''
+            + encodeURIComponent(category) + '\', \''
+            + encodeURIComponent(block) + '\', \''
+            + encodeURIComponent(dest) + '\', \''
+            + destId + '\')">' +
+            '<span class="pend-arrow">▶</span>' + escapeHtml(dest) + '</button></td>';
+
+          AGING_ORDER.forEach(function(a) {
+            const count = destMap[dest][a] || 0;
+            html += '<td>' + makeCountButton(count, {
+              report_type: reportType,
+              pendency_type: normalizePendencyCategory(category),
+              blocks: block,
+              last_destination: dest,
+              aging_bucket: a
+            }, reportType + ' / ' + category + ' / ' + block + ' / ' + dest + ' / ' + agingLabel(a)) + '</td>';
+          });
+
+          html += '<td>' + makeCountButton(total, {
+            report_type: reportType,
+            pendency_type: normalizePendencyCategory(category),
+            blocks: block,
+            last_destination: dest
+          }, reportType + ' / ' + category + ' / ' + block + ' / ' + dest) + '</td></tr>';
+
+          html += '<tr id="' + destId + '" class="pend-drill-row" style="display:none;"><td colspan="10"></td></tr>';
+        });
+
+        if (!destinations.length) {
+          html += '<tr><td colspan="10" style="color:#999;">No last destination data found.</td></tr>';
+        }
+        html += '</tbody></table></div>';
+        cell.innerHTML = html;
+      } catch (e) {
+        cell.innerHTML = '<div class="pend-drill-wrap" style="color:#c62828;">Failed to load: ' + escapeHtml(e.message) + '</div>';
+      }
+    }
+
+    async function toggleDestinationShipmentTypes(button, reportTypeEncoded, categoryEncoded, blockEncoded, destinationEncoded, rowId) {
+      const row = document.getElementById(rowId);
+      const arrow = button.querySelector('.pend-arrow');
+      if (!row) return;
+
+      if (row.style.display !== 'none') {
+        row.style.display = 'none';
+        arrow.classList.remove('open');
+        return;
+      }
+
+      row.style.display = 'table-row';
+      arrow.classList.add('open');
+
+      const cell = row.querySelector('td');
+      cell.innerHTML = '<div class="pend-drill-wrap" style="color:#888;">Loading shipment types...</div>';
+
+      const reportType = decodeURIComponent(reportTypeEncoded);
+      const category = decodeURIComponent(categoryEncoded);
+      const block = decodeURIComponent(blockEncoded);
+      const destination = decodeURIComponent(destinationEncoded);
+
+      try {
+        const allRows = await getCategoryRows(reportType, normalizePendencyCategory(category));
+        const rows = allRows.filter(function(r) {
+          return String(r.blocks || 'Unknown').trim() === block &&
+                 (String(r.last_destination || 'Unknown').trim() || 'Unknown') === destination;
+        });
+
+        const typeMap = {};
+        rows.forEach(function(r) {
+          const shipmentType = String(r.shipment_type || 'Unknown').trim() || 'Unknown';
+          if (!typeMap[shipmentType]) typeMap[shipmentType] = {};
+          if (!typeMap[shipmentType][r.aging_bucket]) typeMap[shipmentType][r.aging_bucket] = 0;
+          typeMap[shipmentType][r.aging_bucket]++;
+        });
+
+        const shipmentTypes = Object.keys(typeMap).sort();
+        let html = '<div class="pend-drill-wrap">';
+        html += '<table class="pend-drill-table"><thead><tr><th>Shipment Type</th>';
+        AGING_ORDER.forEach(a => { html += '<th>' + agingLabel(a) + '</th>'; });
+        html += '<th>TOTAL</th></tr></thead><tbody>';
+
+        shipmentTypes.forEach(function(shipmentType) {
+          let total = 0;
+          AGING_ORDER.forEach(a => total += typeMap[shipmentType][a] || 0);
+
+          html += '<tr><td>' + escapeHtml(shipmentType) + '</td>';
+
+          AGING_ORDER.forEach(function(a) {
+            const count = typeMap[shipmentType][a] || 0;
+            html += '<td>' + makeCountButton(count, {
+              report_type: reportType,
+              pendency_type: normalizePendencyCategory(category),
+              blocks: block,
+              last_destination: destination,
+              shipment_type: shipmentType,
+              aging_bucket: a
+            }, reportType + ' / ' + category + ' / ' + block + ' / ' + destination + ' / ' + shipmentType + ' / ' + agingLabel(a)) + '</td>';
+          });
+
+          html += '<td>' + makeCountButton(total, {
+            report_type: reportType,
+            pendency_type: normalizePendencyCategory(category),
+            blocks: block,
+            last_destination: destination,
+            shipment_type: shipmentType
+          }, reportType + ' / ' + category + ' / ' + block + ' / ' + destination + ' / ' + shipmentType) + '</td></tr>';
+        });
+
+        if (!shipmentTypes.length) {
+          html += '<tr><td colspan="10" style="color:#999;">No shipment type data found.</td></tr>';
+        }
+
+        html += '</tbody></table></div>';
+        cell.innerHTML = html;
+      } catch (e) {
+        cell.innerHTML = '<div class="pend-drill-wrap" style="color:#c62828;">Failed to load shipment types: ' + escapeHtml(e.message) + '</div>';
+      }
+    }
+
+    function buildPendencyTable(title, rows) {
+      const agingCols = pendencyFilterAging.length ? pendencyFilterAging : AGING_ORDER;
+      const filteredRows = rows.filter(r => pendencyFilterCategories.includes(r.category) && agingCols.includes(r.aging_bucket));
+      const categories = [...new Set(filteredRows.map(r => r.category))].sort();
+      const grid = {};
+      categories.forEach(c => { grid[c] = {}; agingCols.forEach(a => grid[c][a] = 0); });
+      filteredRows.forEach(r => {
+        if (!grid[r.category]) grid[r.category] = {};
+        grid[r.category][r.aging_bucket] = (grid[r.category][r.aging_bucket] || 0) + r.shipment_count;
+      });
+
+      const colTotals = {};
+      agingCols.forEach(a => colTotals[a] = 0);
+      let grandTotal = 0;
+
+      let html = '<div class="pend-section-title">' + escapeHtml(title) + '</div>';
+      html += '<table class="pend-table"><thead><tr><th>Category</th>';
+      agingCols.forEach(a => { html += '<th>' + agingLabel(a) + '</th>'; });
+      html += '<th>TOTAL</th></tr></thead><tbody>';
+
+      categories.forEach(function(cat, index) {
+        let rowTotal = 0;
+        const drillId = 'pend-category-' + title.toLowerCase() + '-' + index;
+        html += '<tr><td>' +
+          '<button class="pend-category-btn" onclick="toggleCategoryDrill(this, \'' +
+          encodeURIComponent(title === 'Forward' ? 'FWD' : 'REV') + '\', \'' +
+          encodeURIComponent(cat) + '\', \'' + drillId + '\')">' +
+          '<span class="pend-arrow">▶</span>' + escapeHtml(cat) + '</button></td>';
+
+        agingCols.forEach(a => {
+          const v = grid[cat][a] || 0;
+          rowTotal += v;
+          colTotals[a] += v;
+          html += '<td>' + makeCountButton(v, {
+            report_type: title === 'Forward' ? 'FWD' : 'REV',
+            pendency_type: normalizePendencyCategory(cat),
+            aging_bucket: a
+          }, title + ' / ' + cat + ' / ' + agingLabel(a)) + '</td>';
+        });
+        grandTotal += rowTotal;
+        html += '<td class="pend-total-col">' + makeCountButton(rowTotal, {
+          report_type: title === 'Forward' ? 'FWD' : 'REV',
+          pendency_type: normalizePendencyCategory(cat)
+        }, title + ' / ' + cat) + '</td></tr>';
+        html += '<tr id="' + drillId + '" class="pend-drill-row" style="display:none;"><td colspan="10"></td></tr>';
+      });
+
+      const reportTypeCode = title === 'Forward' ? 'FWD' : 'REV';
+      html += '<tr class="pend-total-row"><td>TOTAL</td>';
+      agingCols.forEach(a => {
+        html += '<td>' + makeCountButton(colTotals[a], {
+          report_type: reportTypeCode,
+          aging_bucket: a
+        }, title + ' / TOTAL / ' + agingLabel(a)) + '</td>';
+      });
+      html += '<td class="pend-total-col">' + makeCountButton(grandTotal, {
+        report_type: reportTypeCode
+      }, title + ' / TOTAL') + '</td></tr>';
+      html += '</tbody></table>';
+      return html;
+    }
+
+    async function toggleCategoryDrill(button, reportTypeEncoded, categoryEncoded, rowId) {
+      const row = document.getElementById(rowId);
+      const arrow = button.querySelector('.pend-arrow');
+      if (!row) return;
+
+      if (row.style.display !== 'none') {
+        row.style.display = 'none';
+        arrow.classList.remove('open');
+        return;
+      }
+
+      row.style.display = 'table-row';
+      arrow.classList.add('open');
+      const cell = row.querySelector('td');
+      cell.innerHTML = '<div class="pend-drill-wrap" style="color:#888;">Loading blocks...</div>';
+
+      const reportType = decodeURIComponent(reportTypeEncoded);
+      const category = decodeURIComponent(categoryEncoded);
+
+      try {
+        const rows = await getCategoryRows(reportType, normalizePendencyCategory(category));
+
+        const blocks = {};
+        rows.forEach(function(r) {
+          const block = String(r.blocks || 'Unknown').trim() || 'Unknown';
+          if (!blocks[block]) blocks[block] = {};
+          if (!blocks[block][r.aging_bucket]) blocks[block][r.aging_bucket] = 0;
+          blocks[block][r.aging_bucket]++;
+        });
+
+        cell.innerHTML = buildDrillTable(reportType, category, blocks);
+      } catch (e) {
+        cell.innerHTML = '<div class="pend-drill-wrap" style="color:#c62828;">Failed to load blocks: ' + escapeHtml(e.message) + '</div>';
+      }
+    }
+
+    let lastRenderedCapturedAt = null;
+    const pendencyRefreshBanner = document.getElementById('pendencyRefreshBanner');
+
+    function anyPendencyDrillOpen() {
+      const rows = pendencyTables.querySelectorAll('.pend-drill-row, .pend-destination-row');
+      for (let i = 0; i < rows.length; i++) {
+        if (rows[i].style.display === 'table-row') return true;
+      }
+      return false;
+    }
+
+    let lastPendencySummaryData = null;
+
+    function renderPendencyTables(data, capturedAt) {
+      lastPendencySummaryData = data;
+      renderPendencyFilters();
+      const fwdRows = data.filter(r => r.report_type === 'FWD');
+      const revRows = data.filter(r => r.report_type === 'REV');
+
+      pendencyTables.innerHTML =
+        buildPendencyTable('Forward', fwdRows) +
+        buildPendencyTable('Reverse', revRows);
+
+      // A fresh render means new numbers may exist in audit_master too --
+      // drop the drill-down cache so the next expand/download re-fetches
+      // current data instead of serving the previous snapshot's rows.
+      clearPendencyCaches();
+
+      lastRenderedCapturedAt = capturedAt;
+      pendencyRefreshBanner.style.display = 'none';
+
+      const d = new Date(capturedAt);
+      pendencyUpdated.innerText = 'Data as of: ' + d.toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+      }) + ' IST';
+    }
+
+    async function refreshPendency(force) {
+      const { data: latestRow, error: latestErr } = await supabaseClient
+        .from('pendency_snapshot_summary')
+        .select('captured_at')
+        .order('captured_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (latestErr || !latestRow) {
+        pendencyTables.innerHTML = '<p style="color:#999;text-align:center;">No pendency data yet.</p>';
+        return;
+      }
+
+      const isNewData = lastRenderedCapturedAt !== null && latestRow.captured_at !== lastRenderedCapturedAt;
+
+      if (isNewData && !force && anyPendencyDrillOpen()) {
+        // Don't collapse an open drill-down under the user just because
+        // the 30s auto-refresh fired -- flag that newer data exists and
+        // let them refresh on their own terms.
+        pendencyRefreshBanner.style.display = 'flex';
+        return;
+      }
+
+      if (!force && lastRenderedCapturedAt === latestRow.captured_at) {
+        return; // nothing changed since the last render -- skip the rebuild entirely
+      }
+
+      const { data, error } = await supabaseClient
+        .from('pendency_snapshot_summary')
+        .select('report_type, category, aging_bucket, shipment_count')
+        .eq('captured_at', latestRow.captured_at);
+
+      if (error) {
+        pendencyTables.innerHTML = '<p style="color:#c62828;text-align:center;">' + escapeHtml(error.message) + '</p>';
+        return;
+      }
+
+      renderPendencyTables(data, latestRow.captured_at);
+    }
+
+    document.getElementById('pendencyRefreshNowBtn').addEventListener('click', function() {
+      refreshPendency(true);
+    });
+
+
+    // ================= RESET AUDIT DATA =================
+
+    document.getElementById('openResetBtn').addEventListener('click', function() {
+      loginMode = 'reset';
+      currentEmp = null;
+      passTitle.innerText = 'Reset Audit Data — Enter Password';
+      passwordInput.value = '';
+      passError.style.display = 'none';
+      screenLogin.style.display = 'none';
+      screenPassword.style.display = 'flex';
+      passwordInput.focus();
+    });
+
+    document.getElementById('backFromResetConfirm').addEventListener('click', function() {
+      screenResetConfirm.style.display = 'none';
+      screenLogin.style.display = 'flex';
+      loginMode = 'emp';
+    });
+
+    document.getElementById('confirmResetBtn').addEventListener('click', async function() {
+      const btn = this;
+      btn.disabled = true;
+      btn.innerText = 'Resetting...';
+
+      const { error } = await supabaseClient.from('audit_scans').delete().gte('id', 0);
+
+      btn.disabled = false;
+      btn.innerText = 'RESET';
+
+      if (error) {
+        alert('Reset fail: ' + error.message);
+        return;
+      }
+
+      alert('Audit data reset ho gaya.');
+      screenResetConfirm.style.display = 'none';
+      screenLogin.style.display = 'flex';
+      loginMode = 'emp';
+    });
+
+
+    // ================= SINGLE TRACKING =================
+
+    const screenTracking = document.getElementById('screenTracking');
+    const trackingInput = document.getElementById('trackingInput');
+    const trackingResult = document.getElementById('trackingResult');
+
+    document.getElementById('openTrackingBtn').addEventListener('click', function() {
+      screenLogin.style.display = 'none';
+      screenTracking.style.display = 'block';
+      trackingInput.value = '';
+      trackingResult.innerHTML = '';
+      setTimeout(function() { trackingInput.focus(); }, 100);
+    });
+
+    document.getElementById('trackingBack').addEventListener('click', function() {
+      screenTracking.style.display = 'none';
+      screenLogin.style.display = 'flex';
+    });
+
+    const TRACKING_DETAIL_FIELDS = [
+      ['AWB', 'awb_number'], ['Report Type', 'report_type'], ['Pendency', 'pendency_type'],
+      ['Ageing', 'aging_bucket'], ['Last Destination', 'last_destination'], ['Blocks', 'blocks'],
+      ['Primary Bin', 'primary_bin'], ['Secondary Bin', 'secondary_bin'], ['Manifest Code', 'manifest_code'],
+      ['Seal Number', 'seal_number'], ['Layout', 'layout_name'], ['Action User', 'action_user'],
+      ['Employee', 'emp_name'], ['Bin Level', 'bin_level'], ['Bin Name', 'bin_name'],
+      ['Client', 'client_name'], ['Shipment Type', 'shipment_type'],
+      ['Item Last Updated (Last Scanned)', 'item_last_updated'], ['Item Destination', 'item_destination_name']
+    ];
+
+    function renderTrackingDetails(r) {
+      let html = '<div class="result-card success" style="display:block;">';
+      html += '<div class="banner">📦 Shipment Found</div>';
+      TRACKING_DETAIL_FIELDS.forEach(function(f) {
+        html += '<div class="result-row"><span class="k">' + f[0] + '</span><span class="v">' + escapeHtml(r[f[1]] != null ? r[f[1]] : '-') + '</span></div>';
+      });
+      html += '</div>';
+      if (r.manifest_code) {
+        html += '<button class="dash-link-btn" style="background:#555; margin-top:14px; font-size:14px;" ' +
+          'onclick="seeAwbsInManifest(\'' + encodeURIComponent(r.manifest_code) + '\', \'manifest_code\')">👀 See AWBs in Manifest (' + escapeHtml(r.manifest_code) + ')</button>';
+      }
+      if (r.seal_number) {
+        html += '<button class="dash-link-btn" style="background:#555; margin-top:10px; font-size:14px;" ' +
+          'onclick="seeAwbsInManifest(\'' + encodeURIComponent(r.seal_number) + '\', \'seal_number\')">👀 See AWBs under Seal (' + escapeHtml(r.seal_number) + ')</button>';
+      }
+      html += '<div id="manifestAwbList" style="margin-top:12px;"></div>';
+      return html;
+    }
+
+    window.seeAwbsInManifest = async function(valueEncoded, field) {
+      const value = decodeURIComponent(valueEncoded);
+      const container = document.getElementById('manifestAwbList');
+      container.innerHTML = '<div style="color:#888;font-size:13px;">Loading AWBs...</div>';
+
+      const { data, error } = await supabaseClient
+        .from('audit_master')
+        .select('awb_number, aging_bucket, last_destination, pendency_type, report_type')
+        .eq(field, value);
+
+      if (error) {
+        container.innerHTML = '<div style="color:#c62828;font-size:13px;">' + escapeHtml(error.message) + '</div>';
+        return;
+      }
+      if (!data.length) {
+        container.innerHTML = '<div style="color:#999;font-size:13px;">No AWBs found.</div>';
+        return;
+      }
+
+      let html = '<div style="font-size:13px;color:#555;margin-bottom:6px;">' + data.length + ' AWB(s) found:</div>';
+      html += '<table class="pend-drill-table" style="width:100%;"><thead><tr><th>AWB</th><th>Ageing</th><th>Last Destination</th><th>Pendency</th></tr></thead><tbody>';
+      data.forEach(function(row) {
+        html += '<tr><td style="text-align:left;">' + escapeHtml(row.awb_number) + '</td><td>' + escapeHtml(row.aging_bucket) +
+          '</td><td>' + escapeHtml(row.last_destination) + '</td><td>' + escapeHtml(row.pendency_type) + '</td></tr>';
+      });
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    };
+
+    function formatUtcTimestamp(val) {
+      if (!val) return '-';
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return String(val);
+      return d.toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+      });
+    }
+
+    async function fetchLatestAuditScan(awb) {
+      const { data, error } = await supabaseClient
+        .from('audit_scans')
+        .select('awb_number, emp, emp_name, status, ageing, scanned_area, handover_area, scanned_at, last_destination, pendency')
+        .eq('awb_number', awb)
+        .order('scanned_at', { ascending: false })
+        .limit(1);
+      if (error || !data || !data.length) return null;
+      return data[0];
+    }
+
+    function renderLastAuditScan(scan, standalone) {
+      let html = '<div class="result-card ' + (standalone ? (scan.status === 'OK' ? 'success' : 'error') : 'success') + '" style="display:block;margin-top:' + (standalone ? '0' : '14px') + ';">';
+      html += '<div class="banner">' + (standalone ? '📷 Last Audit Scan (not currently in pendency)' : '📷 Last Audit Scan') + '</div>';
+      html += '<div class="result-row"><span class="k">Scanned At</span><span class="v">' + escapeHtml(formatUtcTimestamp(scan.scanned_at)) + '</span></div>';
+      html += '<div class="result-row"><span class="k">Status</span><span class="v">' + escapeHtml(scan.status) + '</span></div>';
+      html += '<div class="result-row"><span class="k">Ageing</span><span class="v">' + escapeHtml(scan.ageing) + '</span></div>';
+      html += '<div class="result-row"><span class="k">Scanned Area</span><span class="v">' + escapeHtml(scan.scanned_area) + '</span></div>';
+      html += '<div class="result-row"><span class="k">Employee</span><span class="v">' + escapeHtml(scan.emp_name || scan.emp) + '</span></div>';
+      if (scan.handover_area) {
+        html += '<div class="result-row"><span class="k">Handover Area</span><span class="v">' + escapeHtml(scan.handover_area) + '</span></div>';
+      }
+      html += '</div>';
+      return html;
+    }
+
+    async function runTrackingSearch() {
+      const raw = trackingInput.value.trim();
+      if (!raw) return;
+      const value = raw.toUpperCase();
+      trackingResult.innerHTML = '<div style="color:#888;text-align:center;">Searching...</div>';
+
+      // Try a direct AWB match first (most specific); fall back to
+      // manifest code or seal number, which can each cover many AWBs.
+      const { data: awbMatch, error: awbErr } = await supabaseClient
+        .from('audit_master')
+        .select('*')
+        .eq('awb_number', value)
+        .limit(1);
+
+      if (awbErr) {
+        trackingResult.innerHTML = '<div style="color:#c62828;text-align:center;">' + escapeHtml(awbErr.message) + '</div>';
+        return;
+      }
+
+      if (awbMatch && awbMatch.length) {
+        // audit_master is only ever as fresh as the last 15-minute
+        // pipeline run -- if this AWB was scanned in the audit app more
+        // recently than that, show that too so the newer status is
+        // visible, not just the possibly-stale pendency snapshot.
+        const latestScan = await fetchLatestAuditScan(value);
+        let html = renderTrackingDetails(awbMatch[0]);
+        if (latestScan) html += renderLastAuditScan(latestScan, false);
+        trackingResult.innerHTML = html;
+        return;
+      }
+
+      // Not in current pendency -- but it may still have an audit-scan
+      // history worth showing instead of a flat "Not Found".
+      const latestScan = await fetchLatestAuditScan(value);
+      if (latestScan) {
+        trackingResult.innerHTML = renderLastAuditScan(latestScan, true);
+        return;
+      }
+
+      const { data: groupMatch, error: groupErr } = await supabaseClient
+        .from('audit_master')
+        .select('awb_number, aging_bucket, last_destination, pendency_type, report_type, manifest_code, seal_number')
+        .or('manifest_code.eq.' + value + ',seal_number.eq.' + value);
+
+      if (groupErr) {
+        trackingResult.innerHTML = '<div style="color:#c62828;text-align:center;">' + escapeHtml(groupErr.message) + '</div>';
+        return;
+      }
+
+      if (groupMatch && groupMatch.length) {
+        let html = '<div class="result-card success" style="display:block;">';
+        html += '<div class="banner">📦 ' + groupMatch.length + ' AWB(s) found under "' + escapeHtml(raw) + '"</div>';
+        html += '</div>';
+        html += '<table class="pend-drill-table" style="width:100%;margin-top:10px;"><thead><tr><th>AWB</th><th>Ageing</th><th>Last Destination</th><th>Pendency</th></tr></thead><tbody>';
+        groupMatch.forEach(function(row) {
+          html += '<tr><td style="text-align:left;">' + escapeHtml(row.awb_number) + '</td><td>' + escapeHtml(row.aging_bucket) +
+            '</td><td>' + escapeHtml(row.last_destination) + '</td><td>' + escapeHtml(row.pendency_type) + '</td></tr>';
+        });
+        html += '</tbody></table>';
+        trackingResult.innerHTML = html;
+        return;
+      }
+
+      trackingResult.innerHTML = '<div class="result-card error" style="display:block;"><div class="banner">❌ Not Found</div></div>';
+    }
+
+    document.getElementById('trackingSearchBtn').addEventListener('click', runTrackingSearch);
+    trackingInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') runTrackingSearch();
+    });
+
+
+    // ================= LAST SCAN DETAILS =================
+
+    const screenLastScan = document.getElementById('screenLastScan');
+    let lastScanReport = 'FWD';
+    let lastScanBlock = null;
+    let lastScanCategory = 'Received at DC';
+    const LAST_SCAN_CATEGORIES = ['CLIENT Warehouse', 'At Dock', 'BRSNR', 'Received at DC'];
+    const LAST_SCAN_COLUMNS = [
+      ['AWB', 'awb_number'], ['Ageing', 'aging_bucket'], ['Item Last Updated', 'item_last_updated'], ['Blocks', 'blocks'],
+      ['Layout Name', 'layout_name'], ['Action User', 'action_user'], ['Emp Name', 'emp_name'],
+      ['Bin Level', 'bin_level'], ['Bin Name', 'bin_name'], ['Rejection Category', 'rejection_category'],
+      ['Client Name', 'client_name'], ['Last Destination', 'last_destination'],
+      ['Primary Bin', 'primary_bin'], ['Secondary Bin', 'secondary_bin'], ['Shipment Type', 'shipment_type']
+    ];
+    let lastScanRows = [];
+    let lastScanColFilters = {};   // column key -> Set of allowed values ("" = no filter)
+
+    document.getElementById('openLastScanBtn').addEventListener('click', function() {
+      screenLogin.style.display = 'none';
+      screenLastScan.style.display = 'block';
+      renderLastScanCategories();
+      loadLastScanBlocks();
+    });
+    document.getElementById('lastScanBack').addEventListener('click', function() {
+      screenLastScan.style.display = 'none';
+      screenLogin.style.display = 'flex';
+    });
+
+    document.getElementById('lastScanReportBtns').addEventListener('click', function(e) {
+      const btn = e.target.closest('button[data-report]');
+      if (!btn) return;
+      document.querySelectorAll('#lastScanReportBtns .pend-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      lastScanReport = btn.dataset.report;
+      loadLastScanBlocks();
+    });
+
+    function renderLastScanCategories() {
+      const container = document.getElementById('lastScanCategoryBtns');
+      container.innerHTML = LAST_SCAN_CATEGORIES.map(function(c) {
+        return '<button class="pend-btn' + (c === lastScanCategory ? ' active' : '') + '" data-cat="' + encodeURIComponent(c) + '">' + escapeHtml(c) + '</button>';
+      }).join('');
+      container.querySelectorAll('button[data-cat]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          container.querySelectorAll('.pend-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          lastScanCategory = decodeURIComponent(btn.dataset.cat);
+          loadLastScanBlocks();
+        });
+      });
+    }
+
+    async function loadLastScanBlocks() {
+      const container = document.getElementById('lastScanBlockBtns');
+      container.innerHTML = '<span style="color:#888;font-size:12px;">Loading blocks...</span>';
+
+      const { data, error } = await supabaseQueryWithRetry(function() {
+        return supabaseClient.from('audit_master').select('blocks')
+          .eq('report_type', lastScanReport).eq('pendency_type', lastScanCategory);
+      });
+      if (error) { container.innerHTML = '<span style="color:#c62828;">' + escapeHtml(error.message) + '</span>'; return; }
+
+      const blocks = [...new Set(data.map(r => r.blocks || 'Unknown'))].sort();
+      if (!blocks.includes(lastScanBlock)) lastScanBlock = blocks[0] || null;
+
+      if (!blocks.length) {
+        container.innerHTML = '<span style="color:#999;font-size:12px;">No blocks for this category.</span>';
+        document.getElementById('lastScanTableWrap').innerHTML = '';
+        return;
+      }
+
+      container.innerHTML = blocks.map(function(b) {
+        return '<button class="pend-btn' + (b === lastScanBlock ? ' active' : '') + '" data-block="' + escapeHtml(b) + '">' + escapeHtml(b) + '</button>';
+      }).join('');
+
+      container.querySelectorAll('button[data-block]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          container.querySelectorAll('.pend-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          lastScanBlock = btn.dataset.block;
+          loadLastScanTable();
+        });
+      });
+
+      loadLastScanTable();
+    }
+
+    async function loadLastScanTable() {
+      const wrap = document.getElementById('lastScanTableWrap');
+      if (!lastScanBlock) { wrap.innerHTML = '<p style="color:#999;">No blocks found.</p>'; return; }
+      wrap.innerHTML = '<p style="color:#888;">Loading...</p>';
+
+      // Paginated -- a hard .limit(300) sorted by item_last_updated was
+      // silently cutting off shipments with older ageing buckets (3-6+
+      // day ones sort toward the bottom and never made it into the top
+      // 300), so some ageing values never appeared at all, in the table
+      // OR in the ageing filter's own option list. Fetch everything that
+      // matches instead.
+      let allRows = [];
+      let from = 0;
+      const PAGE = 1000;
+      while (true) {
+        const { data, error } = await supabaseQueryWithRetry(function() {
+          return supabaseClient.from('audit_master')
+            .select(LAST_SCAN_COLUMNS.map(c => c[1]).join(', '))
+            .eq('report_type', lastScanReport)
+            .eq('pendency_type', lastScanCategory)
+            .eq('blocks', lastScanBlock)
+            .neq('aging_bucket', '0_day')   // 0-day is a clean/just-arrived shipment, not relevant here
+            .order('item_last_updated', { ascending: false })
+            .range(from, from + PAGE - 1);
+        });
+        if (error) { wrap.innerHTML = '<p style="color:#c62828;">' + escapeHtml(error.message) + '</p>'; return; }
+        allRows = allRows.concat(data || []);
+        if (!data || data.length < PAGE) break;
+        from += PAGE;
+      }
+
+      lastScanRows = allRows;
+      lastScanColFilters = {};   // a fresh query resets any per-column filtering
+      renderLastScanTable();
+    }
+
+    function lastScanCellValue(row, key) {
+      return key === 'item_last_updated' ? formatLastScanned(row[key], true) : (row[key] == null ? '' : String(row[key]));
+    }
+
+    function renderLastScanTable() {
+      const wrap = document.getElementById('lastScanTableWrap');
+      if (!lastScanRows.length) { wrap.innerHTML = '<p style="color:#999;">No shipments found for this selection.</p>'; return; }
+
+      const filtered = lastScanRows.filter(function(row) {
+        return LAST_SCAN_COLUMNS.every(function(c) {
+          const allowed = lastScanColFilters[c[1]];
+          if (!allowed || !allowed.size) return true;
+          return allowed.has(lastScanCellValue(row, c[1]));
+        });
+      });
+
+      let html = '<div style="font-size:12px;color:#666;margin-bottom:6px;">Showing ' + filtered.length + ' of ' + lastScanRows.length + ' rows';
+      if (Object.keys(lastScanColFilters).some(k => lastScanColFilters[k] && lastScanColFilters[k].size)) {
+        html += ' &nbsp;<button class="pend-btn" id="lastScanClearFilters" style="padding:2px 8px;font-size:11px;">Clear filters</button>';
+      }
+      html += '</div>';
+
+      html += '<div class="lastscan-table-scroll"><table class="lastscan-table"><thead><tr>';
+      LAST_SCAN_COLUMNS.forEach(function(c) {
+        const active = lastScanColFilters[c[1]] && lastScanColFilters[c[1]].size;
+        html += '<th>' + escapeHtml(c[0]) +
+          ' <span class="lastscan-filter-btn" data-col="' + c[1] + '" style="cursor:pointer;color:' + (active ? '#0f766e' : '#aaa') + ';">&#9662;</span></th>';
+      });
+      html += '</tr></thead><tbody>';
+      filtered.forEach(function(row) {
+        html += '<tr>';
+        LAST_SCAN_COLUMNS.forEach(c => { html += '<td>' + escapeHtml(lastScanCellValue(row, c[1])) + '</td>'; });
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+      wrap.innerHTML = html;
+
+      const clearBtn = document.getElementById('lastScanClearFilters');
+      if (clearBtn) clearBtn.addEventListener('click', function() { lastScanColFilters = {}; renderLastScanTable(); });
+
+      wrap.querySelectorAll('.lastscan-filter-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          openLastScanColumnFilter(btn.dataset.col, btn);
+        });
+      });
+    }
+
+    function openLastScanColumnFilter(colKey, anchorEl) {
+      document.querySelectorAll('.lastscan-filter-panel').forEach(p => p.remove());
+
+      // Distinct values come from rows that pass every OTHER column's
+      // filter, so the choices offered always reflect what's actually
+      // still visible rather than the unfiltered dataset.
+      const others = lastScanRows.filter(function(row) {
+        return LAST_SCAN_COLUMNS.every(function(c) {
+          if (c[1] === colKey) return true;
+          const allowed = lastScanColFilters[c[1]];
+          if (!allowed || !allowed.size) return true;
+          return allowed.has(lastScanCellValue(row, c[1]));
+        });
+      });
+      const values = [...new Set(others.map(r => lastScanCellValue(r, colKey)))].sort();
+      const selected = lastScanColFilters[colKey] || new Set();
+
+      const panel = document.createElement('div');
+      panel.className = 'lastscan-filter-panel';
+      panel.style.cssText = 'position:absolute;background:#fff;border:1px solid #ccc;border-radius:8px;padding:8px;z-index:200;max-height:260px;overflow:auto;min-width:180px;box-shadow:0 4px 12px rgba(0,0,0,0.18);';
+      let inner = '<div style="font-size:11px;color:#666;margin-bottom:4px;">Select values (none = all)</div>';
+      values.forEach(function(v) {
+        const on = selected.has(v);
+        inner += '<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:2px 0;cursor:pointer;">' +
+          '<input type="checkbox" value="' + escapeHtml(v) + '"' + (on ? ' checked' : '') + '> ' + escapeHtml(v || '(blank)') + '</label>';
+      });
+      panel.innerHTML = inner;
+
+      const rect = anchorEl.getBoundingClientRect();
+      panel.style.left = (rect.left + window.scrollX) + 'px';
+      panel.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+      document.body.appendChild(panel);
+
+      panel.addEventListener('change', function(e) {
+        const cb = e.target.closest('input[type=checkbox]');
+        if (!cb) return;
+        if (!lastScanColFilters[colKey]) lastScanColFilters[colKey] = new Set();
+        if (cb.checked) lastScanColFilters[colKey].add(cb.value);
+        else lastScanColFilters[colKey].delete(cb.value);
+        renderLastScanTable();
+      });
+      panel.addEventListener('click', function(e) { e.stopPropagation(); });
+      setTimeout(function() {
+        document.addEventListener('click', function closePanel() {
+          panel.remove();
+          document.removeEventListener('click', closePanel);
+        }, { once: true });
+      }, 0);
+    }
+
+    // ================= HOURLY PERFORMANCE =================
+
+    const screenHourlyPerf = document.getElementById('screenHourlyPerf');
+    let hpBlock = 'Block A';
+    let hpScanType = 'primary';
+    const hpCache = {}; // key: block|scanType -> rows[]
+
+    document.getElementById('openHourlyPerfBtn').addEventListener('click', function() {
+      screenLogin.style.display = 'none';
+      screenHourlyPerf.style.display = 'flex';
+      loadHourlyPerf();
+    });
+    document.getElementById('hourlyPerfBack').addEventListener('click', function() {
+      screenHourlyPerf.style.display = 'none';
+      screenLogin.style.display = 'flex';
+    });
+
+    function hpSetBlock(block) {
+      hpBlock = block;
+      document.getElementById('hpBlockABtn').classList.toggle('active', block === 'Block A');
+      document.getElementById('hpBlockDBtn').classList.toggle('active', block === 'Block D');
+      loadHourlyPerf();
+    }
+    function hpSetType(type) {
+      hpScanType = type;
+      document.getElementById('hpPrimaryBtn').classList.toggle('active', type === 'primary');
+      document.getElementById('hpSecondaryBtn').classList.toggle('active', type === 'secondary');
+      loadHourlyPerf();
+    }
+    document.getElementById('hpBlockABtn').addEventListener('click', function() { hpSetBlock('Block A'); });
+    document.getElementById('hpBlockDBtn').addEventListener('click', function() { hpSetBlock('Block D'); });
+    document.getElementById('hpPrimaryBtn').addEventListener('click', function() { hpSetType('primary'); });
+    document.getElementById('hpSecondaryBtn').addEventListener('click', function() { hpSetType('secondary'); });
+
+    function todayIstDateStr() {
+      const now = new Date();
+      return now.toLocaleString('en-CA', { timeZone: 'Asia/Kolkata', hour12: false }).split(', ')[0];
+    }
+
+    async function loadHourlyPerf() {
+      const wrap = document.getElementById('hourlyPerfTableWrap');
+      const key = hpBlock + '|' + hpScanType;
+
+      if (!hpCache[key]) {
+        wrap.innerHTML = '<p style="color:#888;">Loading...</p>';
+        const dayStart = todayIstDateStr() + ' 00:00:00';
+        const table = hpScanType === 'primary' ? 'primary_scan_events' : 'secondary_scan_events';
+        let rows = [];
+        let from = 0;
+        const PAGE = 1000;
+        while (true) {
+          const { data, error } = await supabaseClient
+            .from(table)
+            .select('layout_name, action_user, emp_name, occurred_at')
+            .eq('blocks', hpBlock)
+            .gte('occurred_at', dayStart)
+            .range(from, from + PAGE - 1);
+          if (error) { wrap.innerHTML = '<p style="color:#c62828;">' + escapeHtml(error.message) + '</p>'; return; }
+          rows = rows.concat(data);
+          if (data.length < PAGE) break;
+          from += PAGE;
+        }
+        hpCache[key] = rows;
+      }
+
+      renderHourlyPerfTable(hpCache[key]);
+    }
+
+    const HOURLY_SCAN_THRESHOLDS = { primary: 650, secondary: 280 };
+
+    let hpLayoutFilter = new Set();   // empty = all
+    let hpHourFilter = new Set();     // empty = all
+    let hpCategoryFilter = new Set(); // empty = all (AIR/ZONAL/INTRA/MUVRO)
+    const HP_MIN_COUNT = 50;          // hide anything below this
+
+    function naturalLayoutSort(a, b) {
+      // "INTRA-A-SSC." before "INTRA-A-SSC._1" before "INTRA-A-SSC._2",
+      // and _2 before _10 (plain string sort would put _10 first).
+      return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+    }
+
+    function hpCategoryOfLayout(layout) {
+      const l = String(layout || '').toUpperCase();
+      if (l.startsWith('NBP-AIR')) return 'AIR';
+      if (l.startsWith('NBP-ZON')) return 'ZONAL';
+      if (l.startsWith('NBP-INTRA')) return 'INTRA';
+      if (l.startsWith('NBP-MU')) return 'MUVRO';
+      return null; // uncategorized -- shown only when no category filter is active
+    }
+
+    function renderHourlyPerfTable(rows) {
+      const wrap = document.getElementById('hourlyPerfTableWrap');
+      if (!rows.length) { wrap.innerHTML = '<p style="color:#999;">No scans yet today.</p>'; return; }
+
+      const grouped = {};
+      const hoursSeen = {};
+
+      rows.forEach(function(r) {
+        const hm = parseIstHourMinute(r.occurred_at);
+        if (!hm) return;
+        const hour = String(hm.hours).padStart(2, '0');
+        const layout = r.layout_name || '(blank)';
+        const cat = hpCategoryOfLayout(layout);
+        if (hpCategoryFilter.size && (!cat || !hpCategoryFilter.has(cat))) return;
+        if (hpLayoutFilter.size && !hpLayoutFilter.has(layout)) return;
+        if (hpHourFilter.size && !hpHourFilter.has(hour)) return;
+        hoursSeen[hour] = true;
+        // Grouped by the raw action_user id (a stable key) -- emp_name is
+        // carried alongside so both can be shown together in one column.
+        const actionUser = r.action_user || '(blank)';
+        if (!grouped[layout]) grouped[layout] = {};
+        if (!grouped[layout][actionUser]) grouped[layout][actionUser] = { empName: r.emp_name || '', hours: {} };
+        if (r.emp_name && !grouped[layout][actionUser].empName) grouped[layout][actionUser].empName = r.emp_name;
+        grouped[layout][actionUser].hours[hour] = (grouped[layout][actionUser].hours[hour] || 0) + 1;
+      });
+
+      const hours = Object.keys(hoursSeen).sort();
+      const layoutOrder = Object.keys(grouped).sort(naturalLayoutSort);
+      const colTotals = {};
+      hours.forEach(h => colTotals[h] = 0);
+      let grandTotal = 0;
+      const hourlyThreshold = HOURLY_SCAN_THRESHOLDS[hpScanType];
+      // Every count on this page -- individual cells, row totals, column
+      // totals, and the grand total -- uses the SAME threshold/colour
+      // rule, not just the Grand Total row.
+      function hpColor(v) { return v >= hourlyThreshold ? '#1e7e34' : '#c00000'; }
+
+      // Build all filter option lists from the UNFILTERED rows, so a
+      // filter never hides its own options and can always be undone.
+      const allLayouts = [...new Set(rows.map(r => r.layout_name || '(blank)'))].sort(naturalLayoutSort);
+      const allHours = [...new Set(rows.map(function(r) {
+        const hm = parseIstHourMinute(r.occurred_at);
+        return hm ? String(hm.hours).padStart(2, '0') : null;
+      }).filter(Boolean))].sort();
+
+      let html = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px;">';
+      html += '<div style="position:relative;"><button class="pend-btn" id="hpLayoutFilterBtn" style="padding:5px 10px;font-size:11px;">Layout (' +
+        (hpLayoutFilter.size || 'all') + ') &#9662;</button>' +
+        '<div id="hpLayoutPanel" style="display:none;position:absolute;top:100%;left:0;background:#fff;border:1px solid #ccc;border-radius:8px;padding:8px;z-index:60;max-height:260px;overflow:auto;min-width:210px;box-shadow:0 4px 12px rgba(0,0,0,0.18);">';
+      allLayouts.forEach(function(l) {
+        html += '<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:2px 0;cursor:pointer;">' +
+          '<input type="checkbox" data-hp-layout="' + escapeHtml(l) + '"' + (hpLayoutFilter.has(l) ? ' checked' : '') + '> ' + escapeHtml(l) + '</label>';
+      });
+      html += '</div></div>';
+      html += '<span style="font-size:11px;color:#888;align-self:center;">Counts below ' + HP_MIN_COUNT + ' are hidden</span>';
+      html += '</div>';
+
+      html += '<div class="lastscan-table-scroll"><table class="pend-table"><thead><tr><th>layout_name</th><th>employee (action user)</th>';
+      hours.forEach(h => { html += '<th>' + h + '</th>'; });
+      html += '<th>Grand Total</th></tr></thead><tbody>';
+
+      let anyRowShown = false;
+      layoutOrder.forEach(function(layout) {
+        const users = Object.keys(grouped[layout]).sort();
+        let firstRow = true;
+        users.forEach(function(actionUser) {
+          const info = grouped[layout][actionUser];
+          let rowTotal = 0;
+          hours.forEach(h => { rowTotal += (info.hours[h] || 0); });
+          // Skip low-volume rows entirely rather than showing single-digit
+          // noise -- these are throughput targets, not an audit trail.
+          if (rowTotal < HP_MIN_COUNT) return;
+          anyRowShown = true;
+
+          const label = info.empName ? (info.empName + ' (' + actionUser + ')') : actionUser;
+          html += '<tr><td>' + (firstRow ? '<b>' + escapeHtml(layout) + '</b>' : '') + '</td><td>' + escapeHtml(label) + '</td>';
+          firstRow = false;
+          hours.forEach(function(h) {
+            const v = info.hours[h] || 0;
+            colTotals[h] += v;
+            html += '<td' + (v ? ' style="color:' + hpColor(v) + ';font-weight:600;"' : '') + '>' + (v >= HP_MIN_COUNT ? v : (v || '')) + '</td>';
+          });
+          grandTotal += rowTotal;
+          html += '<td class="pend-total-col" style="color:' + hpColor(rowTotal) + ';">' + rowTotal + '</td></tr>';
+        });
+      });
+
+      if (!anyRowShown) {
+        html += '<tr><td colspan="' + (hours.length + 3) + '" style="color:#999;text-align:center;">No rows at or above ' + HP_MIN_COUNT + ' scans.</td></tr>';
+      }
+
+      html += '<tr class="pend-total-row"><td colspan="2">Grand Total</td>';
+      hours.forEach(function(h) {
+        // >= threshold is GREEN (inclusive), anything below is RED --
+        // applies to every hour column here exactly as it does to the
+        // half-hour/full-hour ntfy images.
+        const color = colTotals[h] >= hourlyThreshold ? '#1e7e34' : '#c00000';
+        html += '<td style="color:' + color + ';font-weight:700;">' + colTotals[h] + '</td>';
+      });
+      const grandColor = grandTotal >= hourlyThreshold ? '#1e7e34' : '#c00000';
+      html += '<td class="pend-total-col" style="color:' + grandColor + ';">' + grandTotal + '</td></tr>';
+      html += '</tbody></table></div>';
+
+      wrap.innerHTML = html;
+      renderHpHourButtons(allHours);
+      wireHourlyPerfFilters();
+    }
+
+    function renderHpHourButtons(allHours) {
+      const container = document.getElementById('hpHourBtns');
+      container.innerHTML = allHours.map(function(h) {
+        const on = hpHourFilter.has(h);
+        return '<button class="pend-btn' + (on ? ' active' : '') + '" style="padding:4px 10px;font-size:11px;" data-hp-hour-btn="' + h + '">' + h + '</button>';
+      }).join('');
+    }
+
+    document.getElementById('hpCategoryBtns').addEventListener('click', function(e) {
+      const btn = e.target.closest('button[data-hp-cat]');
+      if (!btn) return;
+      const cat = btn.dataset.hpCat;
+      if (hpCategoryFilter.has(cat)) hpCategoryFilter.delete(cat); else hpCategoryFilter.add(cat);
+      btn.classList.toggle('active', hpCategoryFilter.has(cat));
+      renderHourlyPerfTable(hpCache[hpBlock + '|' + hpScanType] || []);
+    });
+
+    document.getElementById('hpHourBtns').addEventListener('click', function(e) {
+      const btn = e.target.closest('button[data-hp-hour-btn]');
+      if (!btn) return;
+      const h = btn.dataset.hpHourBtn;
+      if (hpHourFilter.has(h)) hpHourFilter.delete(h); else hpHourFilter.add(h);
+      renderHourlyPerfTable(hpCache[hpBlock + '|' + hpScanType] || []);
+    });
+
+    function wireHourlyPerfFilters() {
+      const layoutBtn = document.getElementById('hpLayoutFilterBtn');
+      const layoutPanel = document.getElementById('hpLayoutPanel');
+      if (!layoutBtn) return;
+
+      layoutBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        layoutPanel.style.display = layoutPanel.style.display === 'block' ? 'none' : 'block';
+      });
+      layoutPanel.addEventListener('click', function(e) { e.stopPropagation(); });
+
+      layoutPanel.addEventListener('change', function(e) {
+        const cb = e.target.closest('input[data-hp-layout]');
+        if (!cb) return;
+        if (cb.checked) hpLayoutFilter.add(cb.dataset.hpLayout); else hpLayoutFilter.delete(cb.dataset.hpLayout);
+        renderHourlyPerfTable(hpCache[hpBlock + '|' + hpScanType] || []);
+      });
+    }
+
+    document.addEventListener('click', function() {
+      const lp = document.getElementById('hpLayoutPanel');
+      if (lp) lp.style.display = 'none';
+    });
+
+
+    // ================= FINDINGS STATUS =================
+
+    const screenFindings = document.getElementById('screenFindings');
+    let findingsData = null; // { FWD: {category: {block: [{awb,seal,status}]}}, REV: {...} }
+
+    document.getElementById('openFindingsBtn').addEventListener('click', function() {
+      screenLogin.style.display = 'none';
+      screenFindings.style.display = 'block';
+      refreshFindings();
+    });
+    document.getElementById('findingsBack').addEventListener('click', function() {
+      screenFindings.style.display = 'none';
+      screenLogin.style.display = 'flex';
+    });
+
+    function findingsEpoch(val, assumeIst) {
+      if (!val) return null;
+      if (assumeIst) {
+        // audit_master.item_last_updated is plain IST text with no
+        // timezone marker -- attach +05:30 explicitly so it compares
+        // correctly against audit_scans.scanned_at (a real timestamptz).
+        const m = String(val).match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+        if (!m) return null;
+        const d = new Date(m[1] + '-' + m[2] + '-' + m[3] + 'T' + m[4] + ':' + m[5] + ':' + (m[6] || '00') + '+05:30');
+        return isNaN(d.getTime()) ? null : d.getTime();
+      }
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d.getTime();
+    }
+
+    async function refreshFindings() {
+      const container = document.getElementById('findingsTables');
+      container.innerHTML = '<p style="color:#888;text-align:center;">Loading...</p>';
+
+      let findings = [];
+      let from = 0;
+      const PAGE = 1000;
+      while (true) {
+        const { data, error } = await supabaseClient
+          .from('active_findings')
+          .select('awb_number, report_type, pendency_type, blocks, seal_number')
+          .range(from, from + PAGE - 1);
+        if (error) { container.innerHTML = '<p style="color:#c62828;">' + escapeHtml(error.message) + '</p>'; return; }
+        findings = findings.concat(data);
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+
+      if (!findings.length) {
+        container.innerHTML = '<p style="color:#999;text-align:center;">No open or closed findings.</p>';
+        document.getElementById('findingsUpdated').innerText = '';
+        return;
+      }
+
+      // Live status -- same rule as findings_cleanup.py, computed fresh on
+      // every view so the page shows real-time status even between the
+      // two scheduled prune runs. Also builds "last scanned" info here --
+      // whichever of audit_master (pipeline) or audit_scans (manual audit
+      // scan) has the more recent timestamp for that AWB wins.
+      const awbs = findings.map(f => f.awb_number);
+      const currentStage = {};
+      const lastSeen = {};
+      const CHUNK = 200;
+      for (let i = 0; i < awbs.length; i += CHUNK) {
+        const chunk = awbs.slice(i, i + CHUNK);
+        const { data } = await supabaseClient.from('audit_master')
+          .select('awb_number, pendency_type, blocks, layout_name, item_last_updated').in('awb_number', chunk);
+        (data || []).forEach(function(r) {
+          currentStage[r.awb_number] = r.pendency_type;
+          const t = findingsEpoch(r.item_last_updated, true);
+          if (t !== null) {
+            lastSeen[r.awb_number] = {
+              epoch: t, time: r.item_last_updated, source: 'Pipeline data',
+              location: [r.blocks, r.layout_name].filter(Boolean).join(' / ') || '-'
+            };
+          }
+        });
+      }
+      for (let i = 0; i < awbs.length; i += CHUNK) {
+        const chunk = awbs.slice(i, i + CHUNK);
+        const { data } = await supabaseClient.from('audit_scans')
+          .select('awb_number, scanned_at, blocks, layout_name, scanned_area').in('awb_number', chunk);
+        (data || []).forEach(function(r) {
+          const t = findingsEpoch(r.scanned_at, false);
+          if (t === null) return;
+          const existing = lastSeen[r.awb_number];
+          if (!existing || t > existing.epoch) {
+            lastSeen[r.awb_number] = {
+              epoch: t, time: r.scanned_at, source: 'Manual audit scan',
+              location: [r.blocks, r.scanned_area, r.layout_name].filter(Boolean).join(' / ') || '-'
+            };
+          }
+        });
+      }
+
+      findingsData = { FWD: {}, REV: {} };
+      findings.forEach(function(f) {
+        const nowStage = currentStage[f.awb_number]; // undefined if gone from audit_master entirely
+        let status;
+        if (f.pendency_type === 'At Dock') {
+          status = (nowStage === undefined) ? 'closed' : 'open';
+        } else {
+          status = (nowStage === 'At Dock') ? 'closed' : 'open';
+        }
+        const rt = f.report_type === 'REV' ? 'REV' : 'FWD';
+        const cat = f.pendency_type || 'Unknown';
+        const block = f.blocks || 'Unknown';
+        if (!findingsData[rt][cat]) findingsData[rt][cat] = {};
+        if (!findingsData[rt][cat][block]) findingsData[rt][cat][block] = [];
+        findingsData[rt][cat][block].push({
+          awb: f.awb_number, seal: f.seal_number, status: status,
+          lastSeen: lastSeen[f.awb_number] || null
+        });
+      });
+
+      container.innerHTML = buildFindingsSection('Forward', 'FWD') + buildFindingsSection('Reverse', 'REV');
+      document.getElementById('findingsUpdated').innerText = 'Live status as of: ' + new Date().toLocaleTimeString('en-IN', { hour12: false });
+    }
+
+    function countStatus(list, status) {
+      return list.filter(x => x.status === status).length;
+    }
+
+    function buildFindingsSection(title, rt) {
+      const cats = Object.keys(findingsData[rt]).sort();
+      if (!cats.length) return '';
+
+      let html = '<div class="pend-section-title">' + title + '</div>';
+      html += '<table class="pend-table"><thead><tr><th>Category</th><th>Open</th><th>Closed</th></tr></thead><tbody>';
+
+      cats.forEach(function(cat) {
+        const allInCat = Object.values(findingsData[rt][cat]).flat();
+        const open = countStatus(allInCat, 'open');
+        const closed = countStatus(allInCat, 'closed');
+        const rowId = 'fcat-' + rt + '-' + sanitizeId(cat);
+        html += '<tr id="' + rowId + '"><td><span class="findings-cat-toggle" style="cursor:pointer;color:#0369a1;font-weight:700;" data-rt="' + rt + '" data-cat="' + escapeHtml(cat) + '">▸ ' + escapeHtml(cat) + '</span></td>' +
+          '<td><span class="findings-badge open">' + open + '</span></td>' +
+          '<td><span class="findings-badge closed">' + closed + '</span></td></tr>';
+      });
+
+      html += '</tbody></table>';
+      return html;
+    }
+
+    function sanitizeId(s) { return String(s).replace(/[^a-zA-Z0-9]/g, '_'); }
+
+    document.getElementById('findingsTables').addEventListener('click', function(e) {
+      const catToggle = e.target.closest('.findings-cat-toggle');
+      if (catToggle) { toggleFindingsBlocks(catToggle); return; }
+      const blockToggle = e.target.closest('.findings-block-toggle');
+      if (blockToggle) { toggleFindingsAwbs(blockToggle); return; }
+    });
+
+    function toggleFindingsBlocks(span) {
+      const rt = span.dataset.rt, cat = span.dataset.cat;
+      const rowId = 'fcat-' + rt + '-' + sanitizeId(cat);
+      const row = document.getElementById(rowId);
+      const drillId = 'fdrill-' + sanitizeId(rt) + '-' + sanitizeId(cat);
+      const existing = row.nextElementSibling;
+      if (existing && existing.id === drillId) { existing.remove(); span.innerHTML = '▸ ' + escapeHtml(cat); return; }
+      if (existing && existing.classList && existing.classList.contains('findings-drill')) existing.remove();
+
+      span.innerHTML = '▾ ' + escapeHtml(cat);
+      const blocks = Object.keys(findingsData[rt][cat]).sort();
+      let html = '<div class="pend-drill-wrap"><table class="pend-mini-table"><tbody>';
+      blocks.forEach(function(block) {
+        const list = findingsData[rt][cat][block];
+        const open = countStatus(list, 'open');
+        const closed = countStatus(list, 'closed');
+        const blockRowId = 'fblock-' + drillId + '-' + sanitizeId(block);
+        html += '<tr id="' + blockRowId + '"><td><span class="findings-block-toggle" style="cursor:pointer;color:#0369a1;font-weight:700;" data-rt="' + rt + '" data-cat="' + escapeHtml(cat) + '" data-block="' + escapeHtml(block) + '">▸ ' + escapeHtml(block) + '</span></td>' +
+          '<td><span class="findings-badge open">' + open + '</span> <span class="findings-badge closed">' + closed + '</span></td></tr>';
+      });
+      html += '</tbody></table></div>';
+      row.insertAdjacentHTML('afterend', '<tr class="findings-drill" id="' + drillId + '"><td colspan="3">' + html + '</td></tr>');
+    }
+
+    function formatFindingsTime(ls) {
+      if (!ls || !ls.time) return '-';
+      if (ls.source === 'Pipeline data') {
+        // audit_master.item_last_updated is already plain IST text.
+        return formatLastScanned(ls.time, true);
+      }
+      // audit_scans.scanned_at is a real timestamptz (true UTC) -- must
+      // be converted to IST for display, unlike the pipeline's value.
+      const d = new Date(ls.time);
+      if (isNaN(d.getTime())) return String(ls.time);
+      return d.toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+      });
+    }
+
+    function toggleFindingsAwbs(span) {
+      const rt = span.dataset.rt, cat = span.dataset.cat, block = span.dataset.block;
+      const drillId = 'fdrill-' + sanitizeId(rt) + '-' + sanitizeId(cat);
+      const blockRowId = 'fblock-' + drillId + '-' + sanitizeId(block);
+      const blockRow = document.getElementById(blockRowId);
+      const drill2Id = 'fdrill2-' + sanitizeId(blockRowId);
+      const existing = blockRow.nextElementSibling;
+      if (existing && existing.id === drill2Id) { existing.remove(); span.innerHTML = '▸ ' + escapeHtml(block); return; }
+
+      span.innerHTML = '▾ ' + escapeHtml(block);
+      const list = findingsData[rt][cat][block];
+      let html = '<div class="pend-drill-wrap level2"><table class="pend-mini-table"><tbody>';
+      list.forEach(function(item) {
+        const ls = item.lastSeen;
+        const lastSeenText = ls
+          ? escapeHtml(ls.location) + ' &mdash; ' + escapeHtml(formatFindingsTime(ls)) + ' <span style="color:#aaa;">(' + escapeHtml(ls.source) + ')</span>'
+          : '<span style="color:#aaa;">No scan record found</span>';
+        html += '<tr><td>' + escapeHtml(item.awb) + ' <span style="color:#888;">(' + escapeHtml(item.seal || '-') + ')</span>' +
+          '<div style="font-size:11px;color:#555;margin-top:2px;">Last seen: ' + lastSeenText + '</div></td>' +
+          '<td><span class="findings-badge ' + item.status + '">' + item.status.toUpperCase() + '</span></td></tr>';
+      });
+      html += '</tbody></table></div>';
+      blockRow.insertAdjacentHTML('afterend', '<tr class="findings-drill"><td colspan="2">' + html + '</td></tr>');
+    }
+
+    // ================= SCAN PAGE =================
+
+    let dataMap = {};
+    let foundCount = 0;
+    let totalScanCount = 0;
+    let scannedSet = new Set();
+    let dataLoaded = false;
+    let areaValue = '';
+    let areaLocked = false;
+    let manifestCodeMap = {};
+    let sealNumberMap = {};
+    let latestCapturedAt = null;
+
+    const input = document.getElementById('barcodeInput');
+    const areaInput = document.getElementById('areaInput');
+    const handoverBox = document.getElementById('handoverBox');
+    const handoverInput = document.getElementById('handoverInput');
+    let pendingHandoverAwb = null;
+    let pendingHandoverEmp = null;
+    const areaRow = document.getElementById('areaRow');
+    const areaHint = document.getElementById('areaHint');
+    const loadingBar = document.getElementById('loadingBar');
+    const lastFetchLabel = document.getElementById('lastFetchLabel');
+    const resultCard = document.getElementById('resultCard');
+    const AREA_HINT_DEFAULT = 'Scan Area QR First';
+
+    function formatLastScanned(val, withSeconds) {
+      if (!val) return '-';
+      // item_last_updated is stored as plain IST wall-clock text (no
+      // timezone attached) -- just reformat the string directly. Using
+      // new Date()/timeZone conversion here would risk shifting it again,
+      // since the value is already the correct local time as written.
+      const m = String(val).match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+      if (!m) return String(val);
+      const base = `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}`;
+      return withSeconds ? base + ':' + (m[6] || '00') : base;
+    }
+
+    // Shared by every full-screen overlay (handover box, exit confirm) --
+    // stops the page behind the overlay from scrolling at the same time as
+    // the overlay itself, and restores normal scrolling once it's closed.
+    function lockBodyScroll() { document.body.style.overflow = 'hidden'; }
+    function unlockBodyScroll() { document.body.style.overflow = ''; }
+
+    function isAgeingPositive(val) {
+      if (val === null || val === undefined || val === '') return false;
+      // Strip a trailing "_day" (e.g. "6_day" -> "6", "6+_day" -> "6+") --
+      // the raw pendency file includes this suffix, but the old sheet's
+      // formulas stripped it before this check ever ran.
+      const s = String(val).trim().replace(/_day$/i, '');
+      if (s.indexOf('+') !== -1) return true;
+      const n = Number(s);
+      if (!isNaN(n)) return n > 0;
+      return false;
+    }
+
+    // ---------- SOUNDS ----------
+
+    let audioCtx = null;
+    function getCtx() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      return audioCtx;
+    }
+    function beep(freq, durationMs, type) {
+      const ctx = getCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type || 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(1.5, ctx.currentTime);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + durationMs / 1000);
+    }
+    function playSuccessSound() { beep(1000, 150, 'sine'); }
+    function playErrorSound(times) {
+      let played = 0;
+      (function fire() {
+        beep(300, 220, 'square');
+        played++;
+        if (played < times) setTimeout(fire, 260);
+      })();
+    }
+
+    // ================= LOAD DATA =================
+
+    async function loadSheetData() {
+      // Supabase caps a single request at 1000 rows -- with 100,000+
+      // shipments in audit_master, we have to page through in batches
+      // and keep going until a page comes back with fewer rows than we
+      // asked for (that's the signal there's nothing left).
+      const PAGE_SIZE = 1000;
+      let page = 0;
+      let allRows = [];
+
+      while (true) {
+        const from = page * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+        loadingBar.innerText = 'Data loading, please wait... (' + allRows.length + ' loaded)';
+
+        const { data, error } = await supabaseClient
+          .from('audit_master')
+          .select('awb_number, manifest_code, seal_number, aging_bucket, pendency_type, last_destination, primary_bin, secondary_bin, item_last_updated, blocks, layout_name, action_user, emp_name, bin_level, bin_name, client_name, shipment_type, report_type, captured_at')
+          .range(from, to);
+
+        if (error) {
+          loadingBar.innerText = 'Data loading failed: ' + error.message;
+          loadingBar.style.display = 'block';
+          return;
+        }
+
+        allRows = allRows.concat(data);
+        if (data.length < PAGE_SIZE) break;
+        page++;
+      }
+
+      allRows.forEach(function(r) {
+        const key = String(r.awb_number).trim().toUpperCase();
+        const record = {
+          ageing: r.aging_bucket,
+          pendency: r.pendency_type,
+          lastDestination: r.last_destination,
+          primaryBin: r.primary_bin,
+          secondaryBin: r.secondary_bin,
+          itemLastUpdated: r.item_last_updated,
+          blocks: r.blocks,
+          layoutName: r.layout_name,
+          actionUser: r.action_user,
+          empName: r.emp_name,
+          binLevel: r.bin_level,
+          binName: r.bin_name,
+          clientName: r.client_name,
+          shipmentType: r.shipment_type,
+          reportType: r.report_type
+        };
+        dataMap[key] = record;
+
+        // Alternate match keys -- a scan of the manifest code or seal
+        // number should also find this same shipment's data.
+        if (r.manifest_code) {
+          manifestCodeMap[String(r.manifest_code).trim().toUpperCase()] = key;
+        }
+        if (r.seal_number) {
+          sealNumberMap[String(r.seal_number).trim().toUpperCase()] = key;
+        }
+
+        if (r.captured_at && (!latestCapturedAt || r.captured_at > latestCapturedAt)) {
+          latestCapturedAt = r.captured_at;
+        }
+      });
+
+      dataLoaded = true;
+      loadingBar.style.display = 'none';
+      updateLastFetchDisplay();
+      updateAwbInputState();
+    }
+
+    function updateLastFetchDisplay() {
+      if (!latestCapturedAt) return;
+      const d = new Date(latestCapturedAt);
+      const formatted = d.toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+      });
+      lastFetchLabel.innerText = 'Data as of: ' + formatted + ' IST';
+      lastFetchLabel.style.display = 'block';
+    }
+
+    function updateAwbInputState() {
+      if (dataLoaded && areaLocked) input.focus();
+    }
+
+    // ---------- SCANNER-ONLY INPUT ----------
+
+    function attachScannerOnlyInput(el, onSubmit) {
+      let lastTime = 0;
+      el.addEventListener('keydown', function(e) {
+        if (el.disabled) return;
+        if (e.key === 'Enter') {
+          const val = el.value.trim();
+          el.value = '';
+          lastTime = 0;
+          if (val) onSubmit(val);
+          return;
+        }
+        if (e.ctrlKey || e.metaKey) return; // let Ctrl/Cmd shortcuts (paste, etc.) through untouched
+        if (e.key.length !== 1) return;
+        const now = Date.now();
+        const gap = now - lastTime;
+        lastTime = now;
+        if (el.value.length > 0 && gap > 60) {
+          e.preventDefault();
+          el.value = '';
+        }
+      });
+    }
+
+    attachScannerOnlyInput(input, function(raw) { processScan(raw); });
+    attachScannerOnlyInput(areaInput, function(raw) { processAreaScan(raw); });
+    attachScannerOnlyInput(handoverInput, function(raw) { processHandoverScan(raw); });
+
+    // ================= CAMERA-BASED SCANNING =================
+    // Fallback for phones without a hardware barcode scanner. The camera
+    // renders INLINE, directly under its own input box (same width) --
+    // never as a full-screen overlay, so the input and the result card
+    // both stay visible while scanning.
+
+    let camScanner = null;
+    let camScanTargetId = null;
+    let camScanBusy = false;
+
+    const CAM_TARGET_HANDLERS = {
+      barcodeInput: function(text) { processScan(text); },
+      handoverInput: function(text) { processHandoverScan(text); },
+      areaInput: function(text) { processAreaScan(text); },
+      trackingInput: function(text) { trackingInput.value = text; runTrackingSearch(); }
+    };
+
+    function camButtonFor(targetId) {
+      return document.querySelector('.cam-scan-btn[data-target="' + targetId + '"]');
+    }
+
+    function openCameraScanner(targetId) {
+      // Only one camera can run at a time -- switching targets closes the
+      // previous one first.
+      if (camScanner && camScanTargetId !== targetId) closeCameraScanner();
+      if (camScanner && camScanTargetId === targetId) return; // already running here
+
+      camScanTargetId = targetId;
+      camScanBusy = false;
+      document.getElementById('camPanel_' + targetId).style.display = 'block';
+      const btn = camButtonFor(targetId);
+      if (btn) btn.classList.add('cam-active');
+
+      camScanner = new Html5Qrcode('camReader_' + targetId, {
+        // Limiting to the formats actually used (1D AWB/manifest barcodes
+        // + QR for area/handover codes) cuts decode work per frame.
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.CODE_93,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.ITF,
+          Html5QrcodeSupportedFormats.CODABAR
+        ],
+        verbose: false
+      });
+
+      camScanner.start(
+        { facingMode: 'environment' },
+        {
+          fps: 20,
+          // Compact scan region to match the smaller inline panel.
+          qrbox: { width: 200, height: 55 },
+          disableFlip: false,
+          // Barcodes are far more focus-sensitive than QR codes -- phone
+          // cameras default to a focus mode that hunts badly at close
+          // range. Continuous autofocus + a higher-resolution feed fixes
+          // this where supported; in "advanced" so unsupported browsers
+          // ignore it instead of failing to start.
+          videoConstraints: {
+            facingMode: 'environment',
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            advanced: [{ focusMode: 'continuous' }]
+          }
+          // NOTE: deliberately NOT using experimentalFeatures.useBarCodeDetectorIfSupported
+          // -- the native browser BarcodeDetector API is inconsistent about
+          // QR_CODE support across devices and was the cause of QR scans
+          // intermittently failing to decode. The library's own decoder
+          // (used here) is what reliably worked for QR before.
+        },
+        function(decodedText) { handleCameraDecode(decodedText); },
+        function() { /* ignore per-frame decode misses */ }
+      ).catch(function(err) {
+        alert('Could not start camera: ' + err);
+        closeCameraScanner();
+      });
+    }
+
+    function flashCamBarSuccess(targetId, text) {
+      const panel = document.getElementById('camPanel_' + targetId);
+      if (!panel) return;
+      const bar = panel.querySelector('.cam-bar');
+      const span = bar ? bar.querySelector('span') : null;
+      if (!bar || !span) return;
+      const original = span.innerText;
+      span.innerText = text;
+      bar.classList.add('cam-bar-success');
+      setTimeout(function() {
+        bar.classList.remove('cam-bar-success');
+        span.innerText = original;
+      }, 1200);
+    }
+
+    async function handleCameraDecode(decodedText) {
+      // Ignore rapid repeat callbacks while the same code is still in
+      // frame -- one physical scan would otherwise fire many times.
+      if (camScanBusy) return;
+      camScanBusy = true;
+
+      const targetId = camScanTargetId;
+      if (targetId === 'barcodeInput') {
+        // Continuous: the camera keeps running scan after scan and is
+        // only ever closed by the user tapping the camera icon / X.
+        // An ageing shipment does NOT close it -- the handover panel
+        // opens its own inline camera instead (see processScan). The
+        // camera bar itself flashes green with the scanned AWB so the
+        // success confirmation is visible right where the user is
+        // already looking, not just further down on the result card.
+        flashCamBarSuccess('barcodeInput', '✅ Scanned: ' + decodedText);
+        await processScan(decodedText);
+        setTimeout(function() { camScanBusy = false; }, 1200);
+      } else if (targetId === 'handoverInput') {
+        flashCamBarSuccess('handoverInput', '✅ Scanned: ' + decodedText);
+        const wasRunningOnAwb = camAutoReopenAwb;
+        await processHandoverScan(decodedText);
+        setTimeout(function() {
+          closeCameraScanner();
+          // If the AWB camera was running before the handover interrupted
+          // it, put it straight back so scanning continues uninterrupted.
+          if (wasRunningOnAwb) {
+            camAutoReopenAwb = false;
+            openCameraScanner('barcodeInput');
+          }
+        }, 700);
+      } else {
+        flashCamBarSuccess(targetId, '✅ Scanned: ' + decodedText);
+        setTimeout(function() {
+          closeCameraScanner();
+          const handler = CAM_TARGET_HANDLERS[targetId];
+          if (handler) handler(decodedText);
+        }, 500);
+      }
+    }
+
+    function closeCameraScanner() {
+      const targetId = camScanTargetId;
+      if (targetId) {
+        const panel = document.getElementById('camPanel_' + targetId);
+        if (panel) panel.style.display = 'none';
+        const btn = camButtonFor(targetId);
+        if (btn) btn.classList.remove('cam-active');
+      }
+      camScanBusy = false;
+      camScanTargetId = null;
+      if (camScanner) {
+        const scanner = camScanner;
+        camScanner = null;
+        scanner.stop().then(function() { scanner.clear(); }).catch(function() {});
+      }
+    }
+
+    // Tracks whether the AWB camera was live when a handover prompt
+    // interrupted it, so it can be resumed afterwards.
+    let camAutoReopenAwb = false;
+
+    document.querySelectorAll('[data-cam-close]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        closeCameraScanner();
+      });
+    });
+
+    document.querySelectorAll('.cam-scan-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation(); // don't bubble to a parent row's own click handler (e.g. areaRow's lock/unlock toggle)
+        const targetId = btn.dataset.target;
+        // Tapping the icon toggles -- press again to stop the camera.
+        if (camScanTargetId === targetId) closeCameraScanner();
+        else openCameraScanner(targetId);
+      });
+    });
+    // Triggered whenever a scanned AWB comes back ageing > 0 -- the
+    // employee must scan the area they're handing that shipment over to
+    // before they can scan anything else. This gets recorded against that
+    // same audit_scans row (added via an UPDATE once scanned, since the
+    // row itself was already inserted at scan time) so an audit can later
+    // check exactly where an aged shipment was handed off.
+
+    async function processHandoverScan(rawArea) {
+      const trimmedArea = String(rawArea).trim();
+      if (!trimmedArea || !pendingHandoverAwb) return;
+
+      const awb = pendingHandoverAwb;
+      const emp = pendingHandoverEmp;
+
+      const handoverUpdateResult = await supabaseClient.from('audit_scans')
+        .update({ handover_area: trimmedArea })
+        .eq('emp', emp)
+        .eq('awb_number', awb)
+        .select();
+      if (handoverUpdateResult.error) {
+        console.error('Handover area save failed:', handoverUpdateResult.error.message);
+        alert('Handover area save failed: ' + handoverUpdateResult.error.message);
+      } else if (!handoverUpdateResult.data || !handoverUpdateResult.data.length) {
+        // Update ran with no error but matched zero rows -- most likely
+        // the original scan's insert into audit_scans hadn't landed yet
+        // (a race). Silent before; now at least visible so it can be
+        // reported instead of just quietly not saving.
+        console.error('Handover area save: no matching audit_scans row for', emp, awb);
+        alert('Handover area could not be linked to the original scan (no matching record found). Please tell your supervisor the AWB number: ' + awb);
+      }
+      // Resolve the scanned QR to its human-readable area name (same
+      // lookup table the app already has RLS access to) so the employee
+      // gets a clear confirmation of WHERE they just handed the shipment
+      // over to, not just the raw barcode text.
+      let resolvedName = trimmedArea;
+      try {
+        const { data } = await supabaseClient
+          .from('area_barcodes')
+          .select('area_name')
+          .eq('barcode', trimmedArea.toUpperCase())
+          .limit(1);
+        if (data && data.length && data[0].area_name) resolvedName = data[0].area_name;
+      } catch (e) { /* fall back to raw scanned value */ }
+
+      handoverBox.style.display = 'none';
+      handoverInput.value = '';
+      pendingHandoverAwb = null;
+      pendingHandoverEmp = null;
+      input.disabled = false;
+      unlockBodyScroll();
+      playSuccessSound();
+
+      const nameEl = document.getElementById('handoverResolvedName');
+      const hintEl = document.getElementById('handoverNextHint');
+      nameEl.innerText = '✅ Handover: ' + resolvedName;
+      nameEl.style.display = 'block';
+      hintEl.style.display = 'block';
+      setTimeout(function() {
+        nameEl.style.display = 'none';
+        hintEl.style.display = 'none';
+      }, 6000);
+
+      input.focus();
+    }
+
+    // ================= AREA SCAN =================
+
+    function processAreaScan(rawArea) {
+      const trimmedArea = String(rawArea).trim();
+      if (!trimmedArea) return;
+
+      areaValue = trimmedArea;
+      areaLocked = true;
+      areaInput.value = areaValue;
+      areaInput.blur();
+
+      areaRow.classList.remove('err');
+      areaRow.classList.add('locked', 'scanned');
+      areaHint.classList.remove('err-text');
+      areaHint.innerText = 'Area locked: ' + areaValue + ' — click the area box to change it.';
+
+      playSuccessSound();
+      updateAwbInputState();
+    }
+
+    areaRow.addEventListener('click', function() {
+      if (!areaLocked) { areaInput.focus(); return; }
+      areaLocked = false;
+      areaValue = '';
+      areaInput.value = '';
+      areaRow.classList.remove('locked', 'scanned', 'err');
+      areaHint.classList.remove('err-text');
+      areaHint.innerText = 'Scan Area QR First';
+      areaInput.focus();
+    });
+
+    // ================= AWB SCAN =================
+
+    function sendAuditFoundAlert(record, ageingVal, rawBarcode) {
+      const topic = record.reportType === 'REV' ? AUDIT_NTFY_TOPIC_REV : AUDIT_NTFY_TOPIC_FWD;
+      if (!topic) return; // topic not configured -- see AUDIT_NTFY_TOPIC_FWD/REV above
+      const message = [
+        'AWB: ' + rawBarcode,
+        'Ageing: ' + (ageingVal || '-'),
+        'Found via: Manual Audit Scan',
+        'Employee: ' + (currentEmp || '-'),
+        'Blocks: ' + (record.blocks || '-'),
+        'Layout Name: ' + (record.layoutName || '-'),
+        'Last Destination: ' + (record.lastDestination || '-'),
+        'Client Name: ' + (record.clientName || '-'),
+        'Shipment Type: ' + (record.shipmentType || '-')
+      ].join('\n');
+      fetch('https://ntfy.sh/' + topic, {
+        method: 'POST',
+        body: message,
+        headers: { 'Title': 'Audit scan found: ' + rawBarcode, 'Priority': 'high', 'Tags': 'mag' }
+      }).catch(function(e) { console.error('Audit-scan ntfy alert failed:', e); });
+    }
+
+    async function processScan(rawBarcode) {
+
+      if (pendingHandoverAwb) return;   // scanning is locked until the handover-area QR is scanned
+
+      if (!areaLocked) {
+        areaRow.classList.remove('scanned', 'locked');
+        areaRow.classList.add('err');
+        areaHint.classList.add('err-text');
+        areaHint.innerText = 'Scan Area QR First';
+        areaInput.focus();
+        return;
+      }
+
+      if (!dataLoaded) {
+        loadingBar.style.display = 'block';
+        loadingBar.innerText = 'Data loading, please wait...';
+        return;
+      }
+
+      const barcode = rawBarcode.toUpperCase();
+      const isNumericAwb = /^[0-9]+$/.test(barcode);
+      const validPrefix = barcode.startsWith("SF") || barcode.startsWith("MYSF") ||
+                           barcode.startsWith("D") || barcode.startsWith("R") ||
+                           barcode.startsWith("M") || barcode.startsWith("HUBDC") ||
+                           barcode.startsWith("H") || isNumericAwb;
+
+      // Try a direct AWB match first, then fall back to manifest code or
+      // seal number -- a scan of any of the three should find the shipment.
+      const matchedAwb = dataMap[barcode] ? barcode
+        : (manifestCodeMap[barcode] || sealNumberMap[barcode]);
+      const record = matchedAwb ? dataMap[matchedAwb] : undefined;
+      const ageingVal = record ? record.ageing : null;
+      const ageingError = record ? isAgeingPositive(ageingVal) : false;
+      const prefixError = !validPrefix;
+
+      if (ageingError && record) {
+        sendAuditFoundAlert(record, ageingVal, rawBarcode);
+      }
+      // A validly-prefixed barcode that isn't in today's audit_master data
+      // at all is also an error during audit -- previously this silently
+      // showed as "OK" (green) since it tripped neither of the other two
+      // checks.
+      const notFoundError = !record && !prefixError;
+
+      resultCard.style.display = 'block';
+      document.getElementById('rAwb').innerText = rawBarcode;
+      document.getElementById('rReportType').innerText = record ? (record.reportType || '-') : '-';
+      document.getElementById('rLastScanned').innerText = record ? formatLastScanned(record.itemLastUpdated) : '-';
+      document.getElementById('rAgeing').innerText = record ? ageingVal : 'Not Found';
+      document.getElementById('rPrimary').innerText = record ? record.primaryBin : '-';
+      document.getElementById('rSecondary').innerText = record ? record.secondaryBin : '-';
+      document.getElementById('rShipmentType').innerText = record ? (record.shipmentType || '-') : '-';
+      document.getElementById('rPendency').innerText = record ? record.pendency : '-';
+
+      let logStatus;
+      if (ageingError || prefixError || notFoundError) {
+        resultCard.className = 'result-card error';
+        let reasons = [];
+        if (ageingError) reasons.push('AGEING > 0 (' + ageingVal + ')');
+        if (prefixError) reasons.push('INVALID PREFIX');
+        if (notFoundError) reasons.push('NOT FOUND');
+        playErrorSound(ageingError ? 2 : 1);
+        logStatus = reasons.join(' + ');
+      } else {
+        resultCard.className = 'result-card success';
+        playSuccessSound();
+        logStatus = 'OK';
+      }
+
+      document.getElementById('sLastAwb').innerText = rawBarcode;
+      const isDuplicate = scannedSet.has(barcode);
+
+      if (!prefixError && !isDuplicate) {
+        totalScanCount++;
+        if (ageingError || notFoundError) foundCount++;
+      }
+      if (!prefixError) scannedSet.add(barcode);
+
+      document.getElementById('sFound').innerText = foundCount;
+      document.getElementById('sTotal').innerText = totalScanCount;
+
+      // Log to Supabase -- a (emp, awb_number) unique constraint means a
+      // genuine repeat scan for this employee just quietly fails to insert
+      // again, same as the old duplicate check.
+      const scanRow = {
+        emp: currentEmp,
+        awb_number: rawBarcode,  // exactly what was scanned, not the resolved AWB
+        ageing: record ? String(ageingVal) : 'Not Found',
+        last_destination: record ? record.lastDestination : '-',
+        primary_bin: record ? record.primaryBin : '-',
+        secondary_bin: record ? record.secondaryBin : '-',
+        status: logStatus,
+        scanned_area: areaValue,
+        pendency: record ? record.pendency : '-',
+        item_last_updated: record ? record.itemLastUpdated : null,
+        blocks: record ? record.blocks : null,
+        layout_name: record ? record.layoutName : null,
+        action_user: record ? record.actionUser : null,
+        emp_name: record ? record.empName : null,
+        bin_level: record ? record.binLevel : null,
+        bin_name: record ? record.binName : null,
+        client_name: record ? record.clientName : null,
+        shipment_type: record ? record.shipmentType : null,
+        report_type: record ? record.reportType : null
+      };
+
+      supabaseClient.from('audit_scans').insert(scanRow).then(function(res) {
+        if (res.error && res.error.code !== '23505') {
+          console.error('Log failed:', res.error.message);
+        }
+      });
+
+      if (ageingError) {
+        pendingHandoverAwb = rawBarcode;
+        pendingHandoverEmp = currentEmp;
+        input.value = '';
+        input.disabled = true;
+        handoverBox.style.display = 'flex';
+        lockBodyScroll();
+        // If the employee was already scanning with the camera, hand the
+        // camera straight over to the handover panel (inline there too)
+        // so they don't have to reach for the icon mid-flow. If they were
+        // using a hardware scanner instead, the camera stays closed --
+        // the icon is still there if they want it (e.g. for handover).
+        const wasCameraScanning = camScanTargetId === 'barcodeInput';
+        if (wasCameraScanning) {
+          closeCameraScanner();
+          camAutoReopenAwb = true;
+          setTimeout(function() { openCameraScanner('handoverInput'); }, 150);
+        } else {
+          camAutoReopenAwb = false;
+          setTimeout(function() { handoverInput.focus(); }, 50);
+        }
+      } else {
+        input.focus();
+      }
+      return ageingError;
+    }
+
+    // ================= EXIT CONFIRM =================
+
+    function showExitConfirm() { document.getElementById('exitConfirmOverlay').style.display = 'flex'; lockBodyScroll(); }
+    function hideExitConfirm() { document.getElementById('exitConfirmOverlay').style.display = 'none'; if (handoverBox.style.display !== 'flex') unlockBodyScroll(); }
+
+    function doExitScanScreen() {
+      screenScan.style.display = 'none';
+      screenLogin.style.display = 'flex';
+      currentEmp = null;
+      areaLocked = false;
+      areaValue = '';
+      areaInput.value = '';
+      areaRow.classList.remove('locked', 'scanned', 'err');
+      areaHint.classList.remove('err-text');
+      areaHint.innerText = AREA_HINT_DEFAULT;
+      resultCard.style.display = 'none';
+      handoverBox.style.display = 'none';
+      handoverInput.value = '';
+      pendingHandoverAwb = null;
+      pendingHandoverEmp = null;
+      input.disabled = false;
+      unlockBodyScroll();
+      foundCount = 0;
+      totalScanCount = 0;
+      scannedSet = new Set();
+      dataMap = {};
+      dataLoaded = false;
+      manifestCodeMap = {};
+      sealNumberMap = {};
+      latestCapturedAt = null;
+      lastFetchLabel.style.display = 'none';
+      loadingBar.style.display = 'block';
+      loadingBar.innerText = 'Data loading, please wait...';
+      document.getElementById('sLastAwb').innerText = '-';
+      document.getElementById('sFound').innerText = '0';
+      document.getElementById('sTotal').innerText = '0';
+    }
+
+    document.getElementById('scanBackBtn').addEventListener('click', function() { showExitConfirm(); });
+    document.getElementById('exitConfirmNo').addEventListener('click', function() { hideExitConfirm(); });
+    document.getElementById('exitConfirmYes').addEventListener('click', function() {
+      hideExitConfirm();
+      doExitScanScreen();
+    });
+
+    window.addEventListener('popstate', function() {
+      if (screenScan.style.display === 'block') {
+        history.pushState({ scanScreen: true }, '');
+        showExitConfirm();
+      }
+    });
+
+    // ================= TV VIEW (kiosk mode) =================
+    // Reuses the same tables (primary_scan_events / secondary_scan_events)
+    // and the same colour thresholds as everywhere else -- this is a
+    // display-only view, no auth/scan functionality needed.
+
+    const TV_ROTATION_SECONDS = 15;
+    const TV_SCREENS = ['primary', 'secondary', 'secondaryZon', 'loadPending'];
+    let tvScreenIndex = 0;
+    let tvBlock = null;
+    let tvDataCache = { primary: [], secondary: [] };
+    let tvLastFetchedHour = null;
+
+    function tvGetUrlBlock() {
+      const params = new URLSearchParams(window.location.search);
+      const raw = (params.get('tv') || '').trim();
+      if (!raw) return null;
+      // Accept "BlockA"/"BlockB"/"A"/"B"/"Block A" etc.
+      const norm = raw.replace(/[^a-zA-Z]/g, '').toUpperCase();
+      if (norm === 'BLOCKA' || norm === 'A') return 'Block A';
+      if (norm === 'BLOCKD' || norm === 'D') return 'Block D';
+      return raw; // fall back to whatever was literally passed, in case of other real block names
+    }
+
+    // Half-hourly (:45) / full-hour (:15) alternation, matching
+    // scan_rate_alert.py's determine_window() exactly:
+    //   minute < 30  -> FULL-HOUR window = the previous complete hour
+    //                   (e.g. at 13:1x, shows 12:00-13:00)
+    //   minute >= 30 -> HALF-HOUR window = this hour's first half
+    //                   (e.g. at 12:4x, shows 12:00-12:30)
+    const TV_SCAN_RATE_THRESHOLDS = {
+      primary: { half: 325, full: 650 },
+      secondary: { half: 140, full: 280 }
+    };
+
+    function tvCurrentHourWindow() {
+      const now = new Date();
+      const istNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+      const minute = istNow.getMinutes();
+      let windowStart, windowEnd, isFullHour;
+
+      if (minute < 30) {
+        const hourStart = new Date(istNow.getFullYear(), istNow.getMonth(), istNow.getDate(), istNow.getHours(), 0, 0);
+        windowStart = new Date(hourStart.getTime() - 60 * 60 * 1000);
+        windowEnd = hourStart;
+        isFullHour = true;
+      } else {
+        windowStart = new Date(istNow.getFullYear(), istNow.getMonth(), istNow.getDate(), istNow.getHours(), 0, 0);
+        windowEnd = new Date(windowStart.getTime() + 30 * 60 * 1000);
+        isFullHour = false;
+      }
+
+      function fmt(d) {
+        return d.toISOString().slice(0, 10) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') + ':00';
+      }
+      const label = String(windowStart.getHours()).padStart(2, '0') + ':' + String(windowStart.getMinutes()).padStart(2, '0') + '-' +
+        String(windowEnd.getHours() % 24).padStart(2, '0') + ':' + String(windowEnd.getMinutes()).padStart(2, '0') +
+        (isFullHour ? ' (Full-Hour)' : ' (Half-Hourly)');
+
+      return {
+        startStr: fmt(windowStart),
+        endStr: fmt(windowEnd),
+        hourKey: istNow.getFullYear() + '-' + istNow.getMonth() + '-' + istNow.getDate() + '-' + istNow.getHours() + '-' + (isFullHour ? 'full' : 'half'),
+        label: label,
+        isFullHour: isFullHour
+      };
+    }
+
+    async function tvFetchScanType(scanType, window_) {
+      const table = scanType === 'primary' ? 'primary_scan_events' : 'secondary_scan_events';
+      let rows = [];
+      let from = 0;
+      const PAGE = 1000;
+      while (true) {
+        const { data, error } = await supabaseClient
+          .from(table)
+          .select('layout_name, action_user, emp_name, occurred_at')
+          .eq('blocks', tvBlock)
+          .gte('occurred_at', window_.startStr)
+          .lt('occurred_at', window_.endStr)
+          .range(from, from + PAGE - 1);
+        if (error) { console.error('TV fetch failed:', error.message); return []; }
+        rows = rows.concat(data);
+        if (data.length < PAGE) break;
+        from += PAGE;
+      }
+      return rows;
+    }
+
+    function tvLoadPendingSheetForNow() {
+      // 07:00-14:30 -> SDD, 14:30-17:30 -> AIR, 17:30-07:00 -> NDD.
+      const now = new Date();
+      const istNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+      const totalMin = istNow.getHours() * 60 + istNow.getMinutes();
+      if (totalMin >= 7 * 60 && totalMin < 14 * 60 + 30) return 'SDD LOAD';
+      if (totalMin >= 14 * 60 + 30 && totalMin < 17 * 60 + 30) return 'AIR LOAD';
+      return 'NDD LOAD';
+    }
+
+    async function tvFetchLoadPending() {
+      const sheetName = tvLoadPendingSheetForNow();
+      const { data, error } = await supabaseClient
+        .from('load_pending_summary')
+        .select('status_label, shipment_count, vehicle_count')
+        .eq('sheet_name', sheetName);
+      if (error) { console.error('Load Pending fetch failed:', error.message); return { sheetName: sheetName, rows: [] }; }
+      return { sheetName: sheetName, rows: data || [] };
+    }
+
+    async function tvRefreshData() {
+      const window_ = tvCurrentHourWindow();
+      if (tvLastFetchedHour !== window_.hourKey) {
+        // New hour started -- old cached numbers no longer apply.
+        tvDataCache = { primary: [], secondary: [] };
+      }
+      tvLastFetchedHour = window_.hourKey;
+      tvDataCache.primary = await tvFetchScanType('primary', window_);
+      tvDataCache.secondary = await tvFetchScanType('secondary', window_);
+      tvDataCache.windowLabel = window_.label;
+      tvDataCache.isFullHour = window_.isFullHour;
+      // Load Pending is combined (not block-specific) and switches sheet
+      // by time of day, not by hour window -- fetched independently.
+      tvDataCache.loadPending = await tvFetchLoadPending();
+      tvRenderCurrentScreen();
+    }
+
+    function tvBuildPackedHtml(scanType, mode) {
+      // Each displayed column is packed independently from the top.
+      // Primary: all NBP-ZON-A-SSC* layouts are combined into one
+      // "ALL NBP-ZON-A-SSC" column.
+      // Secondary: NBP-INTRA-A-SSC._7+ are combined into OTHER INTRA,
+      // NBP-AIR-DCDC* are combined into ALL AIR-DCDC, while ZON layouts
+      // are shown separately on the dedicated secondary-ZON slide.
+      const rows = tvDataCache[scanType] || [];
+      const threshold = TV_SCAN_RATE_THRESHOLDS[scanType][tvDataCache.isFullHour ? 'full' : 'half'];
+      const grouped = {};   // display column -> actionUser -> {empName, count}
+
+      function startsWith(layout, prefix) {
+        return String(layout || '').toUpperCase().startsWith(prefix);
+      }
+
+      function intraNumber(layout) {
+        const m = String(layout || '').match(/^NBP-INTRA-A-SSC\._(\d+)$/i);
+        return m ? Number(m[1]) : null;
+      }
+
+      function displayColumn(layout) {
+        const l = String(layout || '');
+        const upper = l.toUpperCase();
+
+        if (scanType === 'primary') {
+          if (upper.startsWith('NBP-ZON-A-SSC')) return 'ALL NBP-ZON-A-SSC';
+          return l || '(blank)';
+        }
+
+        // Dedicated ZON slide: show every ZON layout as its own column.
+        if (mode === 'zon') {
+          return startsWith(l, 'NBP-ZON-A-SSC') ? l : null;
+        }
+
+        // Normal Secondary slide.
+        if (startsWith(l, 'NBP-ZON-A-SSC')) return null;
+        if (startsWith(l, 'NBP-AIR-DCDC')) return 'ALL AIR-DCDC';
+        const n = intraNumber(l);
+        if (n !== null && n >= 7) return 'OTHER INTRA';
+        return l || '(blank)';
+      }
+
+      rows.forEach(function(r) {
+        const layout = r.layout_name || '(blank)';
+        const col = displayColumn(layout);
+        if (!col) return;
+        const actionUser = r.action_user || '(blank)';
+        if (!grouped[col]) grouped[col] = {};
+        if (!grouped[col][actionUser]) grouped[col][actionUser] = { empName: r.emp_name || '', count: 0 };
+        if (r.emp_name && !grouped[col][actionUser].empName) grouped[col][actionUser].empName = r.emp_name;
+        grouped[col][actionUser].count += 1;
+      });
+
+      let layouts = Object.keys(grouped);
+      if (scanType === 'primary') {
+        // Keep natural layout order, with the aggregate ZON column where
+        // the ZON group would naturally appear.
+        layouts.sort(function(a, b) {
+          if (a === 'ALL NBP-ZON-A-SSC') return 1;
+          if (b === 'ALL NBP-ZON-A-SSC') return -1;
+          return naturalLayoutSort(a, b);
+        });
+      } else if (mode === 'zon') {
+        layouts.sort(naturalLayoutSort);
+      } else {
+        // Put the aggregate columns after the normal dedicated layouts.
+        layouts.sort(function(a, b) {
+          const rank = function(x) {
+            if (x === 'OTHER INTRA') return 900000;
+            if (x === 'ALL AIR-DCDC') return 900001;
+            return 0;
+          };
+          const ra = rank(a), rb = rank(b);
+          if (ra !== rb) return ra - rb;
+          return naturalLayoutSort(a, b);
+        });
+      }
+
+      function cellColor(v) { return v >= threshold ? '#22c55e' : '#ef4444'; }
+
+      if (!layouts.length) {
+        const label = mode === 'zon' ? 'secondary ZON' : scanType;
+        return '<div style="text-align:center;color:#9fb3d9;font-size:22px;margin-top:60px;">No ' + label + ' scans yet this hour.</div>';
+      }
+
+      const packed = {};
+      const colTotals = {};
+      let maxRows = 0;
+      layouts.forEach(function(l) {
+        const entries = Object.keys(grouped[l]).sort().map(function(u) {
+          const info = grouped[l][u];
+          return { label: info.empName ? (info.empName + ' (' + u + ')') : u, count: info.count };
+        });
+        packed[l] = entries;
+        colTotals[l] = entries.reduce(function(s, e) { return s + e.count; }, 0);
+        if (entries.length > maxRows) maxRows = entries.length;
+      });
+
+      let html = '<table style="width:100%; border-collapse:collapse; font-size:18px;">';
+      html += '<thead><tr style="background:#182544;">';
+      layouts.forEach(l => { html += '<th style="padding:8px 10px; border-bottom:2px solid #2c3e63;">' + escapeHtml(l) + '</th>'; });
+      html += '</tr></thead><tbody>';
+
+      for (let i = 0; i < maxRows; i++) {
+        html += '<tr>';
+        layouts.forEach(function(l) {
+          const entry = packed[l][i];
+          if (entry) {
+            html += '<td style="padding:6px 10px; text-align:center; border-bottom:1px solid #22314f; background:' + cellColor(entry.count) + '; color:#0b1220;">' +
+              '<div style="font-size:12px; font-weight:600; white-space:nowrap;">' + escapeHtml(entry.label) + '</div><div style="font-weight:800; font-size:20px;">' + entry.count + '</div></td>';
+          } else {
+            html += '<td style="padding:6px 10px; border-bottom:1px solid #22314f;"></td>';
+          }
+        });
+        html += '</tr>';
+      }
+
+      html += '<tr style="background:#182544;">';
+      layouts.forEach(function(l) {
+        html += '<td style="padding:8px 10px; text-align:center; font-weight:800; background:' + cellColor(colTotals[l]) + '; color:#0b1220;">' + colTotals[l] + '</td>';
+      });
+      html += '</tr></tbody></table>';
+      return html;
+    }
+
+    function tvBuildPivotHtml(scanType) {
+      return tvBuildPackedHtml(scanType, 'normal');
+    }
+
+    function tvBuildSecondaryZonHtml() {
+      return tvBuildPackedHtml('secondary', 'zon');
+    }
+
+    function tvBuildLoadPendingHtml() {
+      const lp = tvDataCache.loadPending;
+      if (!lp || !lp.rows.length) {
+        return '<div style="text-align:center;color:#9fb3d9;font-size:22px;margin-top:60px;">No Load Pending data yet for ' + escapeHtml(lp ? lp.sheetName : '') + '.</div>';
+      }
+      let html = '<div style="font-size:20px;color:#9fb3d9;margin-bottom:14px;">' + escapeHtml(lp.sheetName) + '</div>';
+
+      // Keep the Load dashboard layout fixed even when the source sheet
+      // does not contain one of these status headings. Missing statuses
+      // must still be visible with 0 values so the TV/dashboard never
+      // changes shape from one refresh to another.
+      const fixedStatuses = [
+        'Arrived/ Unload Pending',
+        'Delivered',
+        'Intransit',
+        'No Load',
+        'Vehicle placed; Departure pending'
+      ];
+
+      const normalizeStatus = function(value) {
+        return String(value || '')
+          .toLowerCase()
+          .replace(/[\u2013\u2014]/g, '-')
+          .replace(/\s+/g, ' ')
+          .trim();
+      };
+
+      const statusMap = {};
+      let sourceGrandTotal = null;
+      (lp.rows || []).forEach(function(r) {
+        const key = normalizeStatus(r.status_label);
+        if (key === 'grand total') {
+          sourceGrandTotal = r;
+          return;
+        }
+        if (key) statusMap[key] = r;
+      });
+
+      // Also tolerate minor source-label variations without changing the
+      // dashboard labels shown to the user.
+      const aliases = {
+        'arrived/unload pending': 'arrived/ unload pending',
+        'arrived / unload pending': 'arrived/ unload pending',
+        'arrived /unload pending': 'arrived/ unload pending',
+        'in transit': 'intransit',
+        'vehicle placed departure pending': 'vehicle placed; departure pending',
+        'vehicle placed; departure pending': 'vehicle placed; departure pending'
+      };
+      Object.keys(aliases).forEach(function(alias) {
+        if (statusMap[alias] && !statusMap[aliases[alias]]) statusMap[aliases[alias]] = statusMap[alias];
+      });
+
+      const fixedRows = fixedStatuses.map(function(label) {
+        const r = statusMap[normalizeStatus(label)] || {};
+        return {
+          status_label: label,
+          shipment_count: Number(r.shipment_count) || 0,
+          vehicle_count: Number(r.vehicle_count) || 0
+        };
+      });
+
+      // Prefer the source Grand Total when present; otherwise calculate it
+      // from the fixed dashboard rows. This keeps the total correct even
+      // when one or more status headings are absent from the source.
+      const grandTotal = sourceGrandTotal ? {
+        shipment_count: Number(sourceGrandTotal.shipment_count) || 0,
+        vehicle_count: Number(sourceGrandTotal.vehicle_count) || 0
+      } : {
+        shipment_count: fixedRows.reduce(function(sum, r) { return sum + r.shipment_count; }, 0),
+        vehicle_count: fixedRows.reduce(function(sum, r) { return sum + r.vehicle_count; }, 0)
+      };
+
+      html += '<table style="width:100%; border-collapse:collapse; font-size:24px;">';
+      html += '<thead><tr style="background:#182544;">' +
+        '<th style="padding:10px; text-align:left; border-bottom:2px solid #2c3e63;">Status</th>' +
+        '<th style="padding:10px; border-bottom:2px solid #2c3e63;">Shipment Count</th>' +
+        '<th style="padding:10px; border-bottom:2px solid #2c3e63;">Vehicle Count</th></tr></thead><tbody>';
+
+      fixedRows.forEach(function(r) {
+        const labelLower = normalizeStatus(r.status_label);
+        const color = labelLower === 'delivered' ? '#22c55e' : '#ef4444';
+        html += '<tr><td style="padding:9px 10px; border-bottom:1px solid #22314f;">' + escapeHtml(r.status_label) + '</td>' +
+          '<td style="padding:9px 10px; text-align:center; border-bottom:1px solid #22314f; color:' + color + '; font-weight:800;">' +
+          r.shipment_count.toLocaleString() + '</td>' +
+          '<td style="padding:9px 10px; text-align:center; border-bottom:1px solid #22314f; color:' + color + '; font-weight:800;">' +
+          r.vehicle_count.toLocaleString() + '</td></tr>';
+      });
+
+      html += '<tr><td style="padding:9px 10px; font-weight:800; border-bottom:1px solid #22314f;">Grand Total</td>' +
+        '<td style="padding:9px 10px; text-align:center; color:#9fb3d9; font-weight:800; border-bottom:1px solid #22314f;">' +
+        grandTotal.shipment_count.toLocaleString() + '</td>' +
+        '<td style="padding:9px 10px; text-align:center; color:#9fb3d9; font-weight:800; border-bottom:1px solid #22314f;">' +
+        grandTotal.vehicle_count.toLocaleString() + '</td></tr>';
+      html += '</tbody></table>';
+      return html;
+    }
+
+    function tvFitToScreen() {
+      // Scales the rendered table DOWN (never up) so it always fits
+      // fully inside the visible area, whatever the row count -- no
+      // scrolling needed on the 43" TV regardless of how many employees
+      // are in a given hour's data.
+      const body = document.getElementById('tvBody');
+      const inner = document.getElementById('tvContentInner');
+      if (!inner) return;
+      inner.style.transform = 'none';
+      inner.style.width = '100%';
+      const availH = body.clientHeight;
+      const availW = body.clientWidth;
+      const contentH = inner.scrollHeight;
+      const contentW = inner.scrollWidth;
+      const scale = Math.min(1, availH / Math.max(contentH, 1), availW / Math.max(contentW, 1));
+      if (scale < 1) {
+        inner.style.width = (100 / scale) + '%';
+        inner.style.transform = 'scale(' + scale + ')';
+      }
+    }
+
+    function tvRenderCurrentScreen() {
+      const screen = TV_SCREENS[tvScreenIndex];
+      const titles = { primary: 'PRIMARY SCAN RATE', secondary: 'SECONDARY SCAN RATE', secondaryZon: 'SECONDARY ZON SCAN RATE', loadPending: 'LOAD PENDING' };
+      document.getElementById('tvTitle').innerText = tvBlock + ' \u2014 ' + titles[screen] +
+        (screen !== 'loadPending' ? ' ' + (tvDataCache.windowLabel || '') : '');
+      const body = document.getElementById('tvBody');
+      let inner;
+      if (screen === 'primary') inner = tvBuildPivotHtml('primary');
+      else if (screen === 'secondary') inner = tvBuildPivotHtml('secondary');
+      else if (screen === 'secondaryZon') inner = tvBuildSecondaryZonHtml();
+      else inner = tvBuildLoadPendingHtml();
+      body.innerHTML = '<div id="tvContentInner" style="transform-origin: top left;">' + inner + '</div>';
+      // Let the browser lay the (full-size) content out first, then
+      // measure and scale it to fit -- has to happen after the DOM
+      // update actually paints.
+      requestAnimationFrame(function() { requestAnimationFrame(tvFitToScreen); });
+    }
+
+    function tvTickClock() {
+      document.getElementById('tvClock').innerText = new Date().toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+      }) + ' IST';
+    }
+
+    function tvMsUntilNextAlertTime() {
+      // Aligned to the same :15/:45 marks the scan-rate ntfy alerts run
+      // on, not a fixed "every 30 min from whenever the page loaded"
+      // timer -- so the TV only updates right when a new scan-alert
+      // cycle has actually settled, matching "sirf scan alert ke time pe".
+      const now = new Date();
+      const istNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+      const target = new Date(istNow.getTime());
+      target.setSeconds(0, 0);
+      const minute = istNow.getMinutes();
+      if (minute < 15) {
+        target.setMinutes(15);
+      } else if (minute < 45) {
+        target.setMinutes(45);
+      } else {
+        target.setHours(target.getHours() + 1);
+        target.setMinutes(15);
+      }
+      return Math.max(1000, target.getTime() - istNow.getTime());
+    }
+
+    function tvScheduleNextRefresh() {
+      setTimeout(function() {
+        tvRefreshData();
+        tvScheduleNextRefresh();
+      }, tvMsUntilNextAlertTime());
+    }
+
+    function tvInit() {
+      tvBlock = tvGetUrlBlock();
+      if (!tvBlock) return;
+
+      document.body.style.overflow = 'hidden';
+      document.getElementById('tvView').style.display = 'block';
+      tvTickClock();
+      setInterval(tvTickClock, 1000);
+
+      tvRefreshData();
+      tvScheduleNextRefresh();   // next update lands exactly on the :15/:45 mark, then every 30 min after that
+
+      setInterval(function() {
+        const hasSecondaryZon = (tvDataCache.secondary || []).some(function(r) {
+          return String(r.layout_name || '').toUpperCase().startsWith('NBP-ZON-A-SSC');
+        });
+        do {
+          tvScreenIndex = (tvScreenIndex + 1) % TV_SCREENS.length;
+        } while (TV_SCREENS[tvScreenIndex] === 'secondaryZon' && !hasSecondaryZon);
+        tvRenderCurrentScreen();
+      }, TV_ROTATION_SECONDS * 1000);
+    }
+
+    tvInit();
+
+    window.addEventListener('resize', function() {
+      if (document.getElementById('tvView').style.display === 'block') tvFitToScreen();
+    });
+
+  </script>
+
+</body>
+</html>
