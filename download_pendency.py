@@ -10,6 +10,9 @@ fails, instead of at every step (that was for debugging the original setup).
 import os
 import sys
 
+import gspread
+import pandas as pd
+from google.auth import default as google_auth_default
 from playwright.sync_api import sync_playwright
 
 FWD_URL = "https://ecomnew.shadowfax.in/floor-pendency-tracking"
@@ -17,9 +20,94 @@ REV_URL = "https://ecomnew.shadowfax.in/floor-pendency-tracking-rev"
 USERNAME = os.environ.get("SHADOWFAX_USERNAME")
 PASSWORD = os.environ.get("SHADOWFAX_PASSWORD")
 SCREENSHOT_DIR = "debug_screenshots"
+AUDIT_SHEET_ID = os.environ.get("AUDIT_SHEET_ID")
+
+FWD_RAW_COLUMNS = [
+    "awb_number", "category", "location_name", "aging_bucket", "manifest_code",
+    "rejection_category", "shipment_type", "item_status_text", "action_user",
+    "bin_level", "bin_name", "layout_name", "seal_number",
+    "manifest_destination_name", "next_location", "client_name",
+    "item_destination_name", "item_last_updated", "inter_intra_flag",
+]
+
+REV_RAW_COLUMNS = [
+    "category", "aging_bucket", "manifest_code", "rejection_category",
+    "action_user", "bin_level", "bin_name", "layout_name", "seal_number",
+    "manifest_next_location_name", "client_name", "item_destination_name",
+    "item_last_updated", "dsp_awb_number", "connected_awb", "inter_intra_flag",
+]
+
+RAW_WRITE_CHUNK = 5000
 
 if not USERNAME or not PASSWORD:
     sys.exit("Missing SHADOWFAX_USERNAME or SHADOWFAX_PASSWORD environment variables.")
+
+
+def _clean_for_sheet(df):
+    """Return Google-Sheets-safe string values while preserving blank cells."""
+    df = df.astype(object)
+    df = df.where(pd.notna(df), "")
+    return [[str(v) if v is not None else "" for v in row] for row in df.values.tolist()]
+
+
+def _write_tab_in_chunks(ws, values):
+    """Replace a raw tab with the current export using bounded requests."""
+    rows = max(1, len(values))
+    cols = max(1, len(values[0]) if values else 1)
+
+    # Resize once so stale rows/columns from a previous, larger export disappear.
+    ws.resize(rows=rows, cols=cols)
+
+    if not values:
+        return
+
+    ws.update(values[:1], "A1", raw=True)
+    start_row = 2
+    for i in range(1, len(values), RAW_WRITE_CHUNK):
+        chunk = values[i:i + RAW_WRITE_CHUNK]
+        ws.update(chunk, f"A{start_row}", raw=True)
+        start_row += len(chunk)
+
+
+def push_raw_to_google_sheet(fwd_path=None, rev_path=None):
+    """Push the filtered FWD/REV exports into the single PENDENCY MASTER workbook."""
+    if not AUDIT_SHEET_ID:
+        raise RuntimeError("Missing AUDIT_SHEET_ID.")
+
+    creds, _ = google_auth_default(
+        scopes=["https://www.googleapis.com/auth/spreadsheets"]
+    )
+    gc = gspread.authorize(creds)
+    sh = gc.open_by_key(AUDIT_SHEET_ID)
+
+    if fwd_path and os.path.exists(fwd_path):
+        fwd = pd.read_csv(
+            fwd_path, dtype=str, na_values=["\\N"], keep_default_na=True
+        )
+        missing = [c for c in FWD_RAW_COLUMNS if c not in fwd.columns]
+        if missing:
+            raise RuntimeError(f"FWD export is missing columns: {missing}")
+        fwd = fwd[FWD_RAW_COLUMNS].copy()
+        fwd_values = [FWD_RAW_COLUMNS] + _clean_for_sheet(fwd)
+        print(f"Writing FWD_RAW: {len(fwd)} rows...")
+        _write_tab_in_chunks(sh.worksheet("FWD_RAW"), fwd_values)
+
+    if rev_path and os.path.exists(rev_path):
+        rev = pd.read_csv(
+            rev_path, dtype=str, na_values=["\\N"], keep_default_na=True
+        )
+        # REV is only the Forward_Cancelled population. order_type is used
+        # only as a filter and is deliberately not stored in REV_RAW.
+        if "order_type" not in rev.columns:
+            raise RuntimeError("REV export is missing required filter column: order_type")
+        rev = rev[rev["order_type"].astype(str).str.strip().eq("Forward_Cancelled")].copy()
+        missing = [c for c in REV_RAW_COLUMNS if c not in rev.columns]
+        if missing:
+            raise RuntimeError(f"REV export is missing columns: {missing}")
+        rev = rev[REV_RAW_COLUMNS].copy()
+        rev_values = [REV_RAW_COLUMNS] + _clean_for_sheet(rev)
+        print(f"Writing REV_RAW: {len(rev)} rows (Forward_Cancelled only)...")
+        _write_tab_in_chunks(sh.worksheet("REV_RAW"), rev_values)
 
 
 def click_login(page):
@@ -225,8 +313,15 @@ def main():
                     "continuing with FWD only."
                 )
 
+            # Filter to the exact raw columns and push both datasets into the
+            # same PENDENCY MASTER workbook. Failed side is not overwritten.
+            push_raw_to_google_sheet(
+                "fwd_pendency.csv" if results["fwd"] else None,
+                "rev_pendency.csv" if results["rev"] else None,
+            )
+
             if results["fwd"] and results["rev"]:
-                print("\nBoth files downloaded successfully.")
+                print("\nBoth files downloaded and FWD_RAW/REV_RAW updated.")
 
         except Exception as e:
             os.makedirs(SCREENSHOT_DIR, exist_ok=True)
