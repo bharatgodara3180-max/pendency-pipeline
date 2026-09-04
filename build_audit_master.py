@@ -1,21 +1,25 @@
+"""Build AUDIT_MASTER entirely inside the PENDENCY MASTER Google Sheet.
+
+NO CLOUDFLARE / D1 is used by this script.
+
+Inputs (same workbook):
+  FWD_RAW, REV_RAW, EXCEPTION, Layout Name Block Wise, MAPPING,
+  EMP_DATA, Stagging, SDD LOAD, AIR LOAD, NDD LOAD
+
+Outputs/state (same workbook):
+  AUDIT_MASTER
+  ALERT_STATE
+  AWB_UPDATE_ALERTS
+  PRIMARY_SCAN_EVENTS
+  SECONDARY_SCAN_EVENTS
+  PFC_FIRST_SEEN
+  RDC_LAST_SEEN
+  AT_DOCK_LAST_SEEN
+  LOAD_PENDING_SUMMARY
+
+NTFY alerts remain direct HTTP calls and do not use Cloudflare.
 """
-Builds the enriched audit_master table from the freshly downloaded FWD/REV
-pendency CSVs, plus the 5 reference sheets that still live in Google Sheets
-(EXCEPTION, Layout Name Block Wise, MAPPING, EMP_DATA, Stagging).
 
-This replicates the RDC AUDIT workbook's DATA-sheet formulas in Python,
-computed once per pipeline run instead of by nested IFERROR/INDEX/MATCH
-formulas recalculating across ~34,000 rows on every edit.
-
-Known, deliberately-preserved quirks carried over from the original sheet
-(not bugs I introduced -- see chat for the full explanation):
-  - The exception override used for "blocks" reads EXCEPTION column E
-    ("Pending With", e.g. a person's name), not column H ("Block").
-  - REV's "last_destination" is always "TAURU_DC_FMRTS" -- the original
-    formula's condition can never be true, so it never takes the other branch.
-"""
-
-import json
 import os
 import sys
 from datetime import datetime, timedelta, timezone
@@ -24,128 +28,98 @@ import gspread
 import pandas as pd
 import requests
 from dateutil import parser as dateutil_parser
-from google.oauth2.service_account import Credentials
-from cf_store import CFStore, put_json
+from google.auth import default as google_auth_default
 
-CF_API_URL = os.environ.get("CF_API_URL")
-CF_API_TOKEN = os.environ.get("CF_API_TOKEN")
-GOOGLE_SERVICE_ACCOUNT_JSON = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
 AUDIT_SHEET_ID = os.environ.get("AUDIT_SHEET_ID")
-FWD_CSV_PATH = os.environ.get("FWD_CSV_PATH", "fwd_pendency.csv")
-REV_CSV_PATH = os.environ.get("REV_CSV_PATH", "rev_pendency.csv")
-CHUNK_SIZE = 500  # was 500 -- fewer, larger requests to cut total run time
-NTFY_TOPIC = os.environ.get("NTFY_TOPIC")           # FWD alerts
-NTFY_TOPIC_REV = os.environ.get("NTFY_TOPIC_REV")    # REV alerts -- separate channel
+NTFY_TOPIC = os.environ.get("NTFY_TOPIC")
+NTFY_TOPIC_REV = os.environ.get("NTFY_TOPIC_REV")
 
-if not all([CF_API_URL, CF_API_TOKEN, GOOGLE_SERVICE_ACCOUNT_JSON, AUDIT_SHEET_ID]):
-    sys.exit(
-        "Missing one of: CF_API_URL, CF_API_TOKEN, "
-        "GOOGLE_SERVICE_ACCOUNT_JSON, AUDIT_SHEET_ID"
-    )
+WRITE_CHUNK = 2500
+STATE_READ_CHUNK = 500
 
-# Category -> which enrichment rules apply, confirmed against the real sheet.
 RDCPFC_CATEGORIES = {"NOT IN BAG / Received at DC", "CLIENT Warehouse"}
 AT_DOCKBRSNR_CATEGORIES = {"IN BAG / At Dock", "IN BAG / BRSNR"}
-
-
-def load_reference_sheets():
-    creds_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
-    creds = Credentials.from_service_account_info(
-        creds_info,
-        scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"],
-    )
-    gc = gspread.authorize(creds)
-    sh = gc.open_by_key(AUDIT_SHEET_ID)
-
-    def rows(tab_name, required=True):
-        try:
-            return sh.worksheet(tab_name).get_all_values()
-        except gspread.exceptions.WorksheetNotFound:
-            if required:
-                raise
-            print(f"WARNING: worksheet '{tab_name}' not found -- skipping (non-critical).")
-            return []
-
-    return {
-        "EXCEPTION": rows("EXCEPTION"),
-        "Layout Name Block Wise": rows("Layout Name Block Wise"),
-        "MAPPING": rows("MAPPING"),
-        "EMP_DATA": rows("EMP_DATA"),
-        "Stagging": rows("Stagging"),
-    }
-
+FWD_PFC_TYPES = {"CLIENT Warehouse", "BRSNR"}
 LOAD_PENDING_SHEETS = ["SDD LOAD", "AIR LOAD", "NDD LOAD"]
 
+if not AUDIT_SHEET_ID:
+    sys.exit("Missing AUDIT_SHEET_ID")
 
-def sync_load_pending_summary(store):
-    """Reads the 3 Vehicle-Pending tabs (SDD/AIR/NDD LOAD) from the same
-    mapping Google Sheet and mirrors their summary rows into store for
-    the TV view's "Load Pending" screen. Same layout on every tab:
-      row 2 = SHIPMENT COUNT, row 3 = VEHICLE COUNT, row 5 = status labels
-      (Delivered / Intransit / No Load / Vehicle placed; Departure
-      pending / Grand Total / ...), column A is just the "VEHICLE NO."
-      label. Whatever labels/columns actually exist are read dynamically
-      -- nothing about the exact column layout is hardcoded, only the
-      row numbers (2/3/5) are fixed, since that's the one thing confirmed
-      identical across all three tabs."""
-    creds_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
-    creds = Credentials.from_service_account_info(
-        creds_info, scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"]
+
+def get_google_client():
+    # GitHub Actions authenticates with Workload Identity Federation.
+    # google-github-actions/auth exposes those short-lived credentials as
+    # Application Default Credentials (ADC), so no service-account JSON secret
+    # is required.
+    creds, _ = google_auth_default(
+        scopes=["https://www.googleapis.com/auth/spreadsheets"]
     )
-    gc = gspread.authorize(creds)
-    sh = gc.open_by_key(AUDIT_SHEET_ID)
+    return gspread.authorize(creds)
 
-    def to_num(v):
-        try:
-            return int(str(v).replace(",", "").strip())
-        except (ValueError, TypeError):
-            return None
 
-    records = []
-    for tab_name in LOAD_PENDING_SHEETS:
-        try:
-            rows = sh.worksheet(tab_name).get_all_values()
-        except gspread.exceptions.WorksheetNotFound:
-            print(f"WARNING: Load Pending worksheet '{tab_name}' not found -- skipping.")
-            continue
-        if len(rows) < 5:
-            print(f"WARNING: '{tab_name}' has fewer than 5 rows -- skipping.")
-            continue
+def get_sheet():
+    return get_google_client().open_by_key(AUDIT_SHEET_ID)
 
-        shipment_row = rows[1]  # row 2
-        vehicle_row = rows[2]   # row 3
-        header_row = rows[4]    # row 5
 
-        for col_idx in range(1, len(header_row)):  # skip column A (the "VEHICLE NO." label column)
-            label = header_row[col_idx].strip() if col_idx < len(header_row) else ""
-            if not label:
-                continue
-            shipment_val = shipment_row[col_idx] if col_idx < len(shipment_row) else ""
-            vehicle_val = vehicle_row[col_idx] if col_idx < len(vehicle_row) else ""
-            records.append({
-                "sheet_name": tab_name,
-                "status_label": label,
-                "shipment_count": to_num(shipment_val),
-                "vehicle_count": to_num(vehicle_val),
-            })
+def get_or_create_worksheet(sh, title, rows=1000, cols=30):
+    try:
+        return sh.worksheet(title)
+    except gspread.exceptions.WorksheetNotFound:
+        print(f"Creating worksheet: {title}")
+        return sh.add_worksheet(title=title, rows=rows, cols=cols)
 
-    if not records:
-        print("Load Pending: nothing read from any tab -- leaving existing data as-is.")
-        return
 
-    put_json("load_pending_summary.json.gz", records)
-    print(f"Load Pending: synced {len(records)} rows across {len(LOAD_PENDING_SHEETS)} tabs to KV.")
+def read_all_values(sh, title):
+    try:
+        return sh.worksheet(title).get_all_values()
+    except gspread.exceptions.WorksheetNotFound:
+        return []
+
+
+def load_reference_sheets(sh):
+    """Read all source/reference tabs from the SAME workbook.
+    FWD_RAW and REV_RAW are therefore not read from local CSV files.
+    """
+    tab_names = [
+        "FWD_RAW",
+        "REV_RAW",
+        "EXCEPTION",
+        "Layout Name Block Wise",
+        "MAPPING",
+        "EMP_DATA",
+        "Stagging",
+        "SDD LOAD",
+        "AIR LOAD",
+        "NDD LOAD",
+    ]
+
+    # One Google Sheets values.batchGet call for all source tabs.
+    ranges = [f"'{name}'!A:ZZ" for name in tab_names]
+    try:
+        response = sh.values_batch_get(ranges)
+    except Exception as e:
+        raise RuntimeError(f"Could not read PENDENCY MASTER source tabs: {e}") from e
+
+    out = {}
+    for name, vr in zip(tab_names, response.get("valueRanges", [])):
+        out[name] = vr.get("values", [])
+
+    for name in ["FWD_RAW", "REV_RAW", "EXCEPTION", "Layout Name Block Wise", "MAPPING", "EMP_DATA", "Stagging"]:
+        if not out.get(name):
+            raise RuntimeError(f"Required worksheet '{name}' is empty or missing.")
+
+    return out
 
 
 def build_lookup_maps(ref):
-    # EXCEPTION columns: A=AWB, B=Category, C=Moved to GA, D=POC,
+    # EXCEPTION: A=AWB, B=Category, C=Moved to GA, D=POC,
     # E=Pending With, F=Status, G=Inbound Date, H=Block
-    exc_rows = ref["EXCEPTION"][1:]
     exception_blocks_override = {}
-    exception_block_col = {}
     exception_salvage = {}
     exception_inbound_date = {}
-    for row in exc_rows:
+    exception_block_col = {}
+
+    for row in ref["EXCEPTION"][1:]:
         if not row or not row[0]:
             continue
         awb = str(row[0]).strip().upper()
@@ -154,12 +128,15 @@ def build_lookup_maps(ref):
         exception_inbound_date[awb] = row[6] if len(row) > 6 else ""
         exception_block_col[awb] = row[7] if len(row) > 7 else ""
 
-    # Layout Name Block Wise: A=Block A, B=Block D, C=PURPLE, D=Block B,
-    # E=Primary, F=Secondary, G=INTRA, H=ZONAL, I=AIR, J=LARGE, K=SAVANA, L=TAURU NYKAA
+    # Layout Name Block Wise
     lw_rows = ref["Layout Name Block Wise"][1:]
 
     def col_set(idx):
-        return {r[idx].strip() for r in lw_rows if len(r) > idx and r[idx].strip()}
+        return {
+            str(r[idx]).strip()
+            for r in lw_rows
+            if len(r) > idx and str(r[idx]).strip()
+        }
 
     block_layout_sets = {
         "Block A": col_set(0),
@@ -176,31 +153,55 @@ def build_lookup_maps(ref):
         "LARGE": col_set(9),
     }
 
-    # MAPPING: A/B = station -> primary bin. D/E/F/G/H = station(D) with
-    # secondary bin name in H (5th column counting from D).
+    # MAPPING
     map_rows = ref["MAPPING"][1:]
-    mapping_ab = {r[0].strip(): r[1].strip() for r in map_rows if len(r) > 1 and r[0].strip()}
-    mapping_d_to_h = {r[3].strip(): r[7].strip() for r in map_rows if len(r) > 7 and r[3].strip()}
+    mapping_ab = {
+        str(r[0]).strip(): str(r[1]).strip()
+        for r in map_rows
+        if len(r) > 1 and str(r[0]).strip()
+    }
+    mapping_d_to_h = {
+        str(r[3]).strip(): str(r[7]).strip()
+        for r in map_rows
+        if len(r) > 7 and str(r[3]).strip()
+    }
 
-    # EMP_DATA: A = action_user id, B = employee name, D = employee's
-    # default/assigned block (used as a fallback when layout matching fails)
+    # EMP_DATA: A=id, B=name, D=default block
     emp_rows = ref["EMP_DATA"][1:]
-    emp_map = {str(r[0]).strip(): r[1].strip() for r in emp_rows if len(r) > 1 and r[0]}
+    emp_map = {
+        str(r[0]).strip(): str(r[1]).strip()
+        for r in emp_rows
+        if len(r) > 1 and str(r[0]).strip()
+    }
     emp_default_block_map = {
-        str(r[0]).strip(): r[3].strip() for r in emp_rows if len(r) > 3 and r[0] and r[3]
+        str(r[0]).strip(): str(r[3]).strip()
+        for r in emp_rows
+        if len(r) > 3 and str(r[0]).strip() and str(r[3]).strip()
     }
 
     # Stagging: A=Zone, B=Cage, C=Next_Destination, D=Zone+Cage key, E=category
     stag_rows = ref["Stagging"][1:]
-    stagging_c_to_d = {r[2].strip(): r[3].strip() for r in stag_rows if len(r) > 3 and r[2].strip()}
-    stagging_d_to_c = {r[3].strip(): r[2].strip() for r in stag_rows if len(r) > 3 and r[3].strip()}
-    stagging_d_to_e = {r[3].strip(): r[4].strip() for r in stag_rows if len(r) > 4 and r[3].strip()}
+    stagging_c_to_d = {
+        str(r[2]).strip(): str(r[3]).strip()
+        for r in stag_rows
+        if len(r) > 3 and str(r[2]).strip()
+    }
+    stagging_d_to_c = {
+        str(r[3]).strip(): str(r[2]).strip()
+        for r in stag_rows
+        if len(r) > 3 and str(r[3]).strip()
+    }
+    stagging_d_to_e = {
+        str(r[3]).strip(): str(r[4]).strip()
+        for r in stag_rows
+        if len(r) > 4 and str(r[3]).strip()
+    }
 
     return {
         "exception_blocks_override": exception_blocks_override,
-        "exception_block_col": exception_block_col,
         "exception_salvage": exception_salvage,
         "exception_inbound_date": exception_inbound_date,
+        "exception_block_col": exception_block_col,
         "block_layout_sets": block_layout_sets,
         "dest_type_sets": dest_type_sets,
         "mapping_ab": mapping_ab,
@@ -214,9 +215,6 @@ def build_lookup_maps(ref):
 
 
 def parse_sheet_date(raw):
-    """Google Sheets dates come back as plain text (often DD/MM/YYYY, Indian
-    style), which Postgres will misread or reject outright. Parse explicitly
-    with day-first assumed, rather than letting the database guess."""
     if not raw or not str(raw).strip():
         return None
     try:
@@ -233,9 +231,7 @@ def resolve_block(layout_name, awb, action_user, lookups):
         if layout_name in layout_set:
             return block_name
     fallback = lookups["emp_default_block_map"].get(str(action_user).strip())
-    if fallback:
-        return fallback
-    return "Unknown"
+    return fallback or "Unknown"
 
 
 def enrich_rdcpfc_style(row, lookups):
@@ -251,11 +247,6 @@ def enrich_rdcpfc_style(row, lookups):
 
 
 def enrich_at_dockbrsnr_style(row, lookups):
-    # Lookup order fixed: item_destination_name first (the shipment's own
-    # declared destination), THEN next_location as a fallback if that's
-    # blank/unmatched, THEN the NCR_Bilaspur_DC default -- previously this
-    # checked manifest_destination_name/manifest_previous_location_name,
-    # which was giving wrong last_destination values.
     item_dest = row.get("item_destination_name") or ""
     next_loc = row.get("next_location") or ""
     primary_bin = (
@@ -270,24 +261,12 @@ def enrich_at_dockbrsnr_style(row, lookups):
 
 def enrich_rev_style(row, is_at_dockbrsnr_variant):
     secondary = "Block B" if is_at_dockbrsnr_variant else "REV PROCESSING AREA"
-
     item_destination = str(row.get("item_destination_name") or "").strip()
-
-    if item_destination == "NBP_DC_FMRTS":
-        last_destination = "NBP_DC_FMRTS"
-    else:
-        last_destination = "TAURU_DC_FMRTS"
-
+    last_destination = "NBP_DC_FMRTS" if item_destination == "NBP_DC_FMRTS" else "TAURU_DC_FMRTS"
     return "CFGR", secondary, last_destination
 
 
 def normalize_aging_bucket(val):
-    """The raw WMS export doesn't stop counting at 6 days -- it keeps
-    going day by day (7_day, 8_day, 9_day, 10_day, 10+_day, ...), but the
-    Live Pendency dashboard only has columns through "6+_day". Anything
-    past 6_day gets collapsed into that one bucket -- same normalization
-    as upload_to_store.py, kept in sync so audit_master's aging_bucket
-    matches what the pendency summary shows."""
     if not val:
         return val
     s = str(val).strip()
@@ -302,13 +281,6 @@ def normalize_aging_bucket(val):
 
 
 def normalize_timestamp(raw):
-    """Keeps item_last_updated as plain IST wall-clock time -- exactly what
-    the WMS portal shows, no UTC conversion at all. Every timestamp column
-    that stores this (audit_master.item_last_updated, awb_last_seen,
-    primary_scan_events/secondary_scan_events.occurred_at) must be a plain `timestamp` column
-    (NOT `timestamptz`), otherwise Postgres/store Studio will display
-    it in UTC regardless of what's written here. This only re-formats the
-    raw CSV value into one consistent string shape."""
     if raw is None or (isinstance(raw, float) and pd.isna(raw)):
         return None
     try:
@@ -339,9 +311,9 @@ def enrich_dataframe(df, lookups, report_type):
             primary_bin, secondary_bin, last_destination = "", "", ""
 
         action_user = row.get("action_user") or ""
-        item_last_updated_raw = row.get("item_last_updated")
-        has_timestamp = item_last_updated_raw is not None and pd.notna(item_last_updated_raw)
-        item_last_updated = normalize_timestamp(item_last_updated_raw) if has_timestamp else None
+        raw_ts = row.get("item_last_updated")
+        has_timestamp = raw_ts is not None and pd.notna(raw_ts)
+        item_last_updated = normalize_timestamp(raw_ts) if has_timestamp else None
         pendency_type = str(category).replace("NOT IN BAG / ", "").replace("IN BAG / ", "")
 
         records.append({
@@ -356,7 +328,7 @@ def enrich_dataframe(df, lookups, report_type):
             "layout_name": layout_name,
             "client_name": row.get("client_name"),
             "item_destination_name": row.get("item_destination_name"),
-            "item_last_updated": item_last_updated if has_timestamp else None,
+            "item_last_updated": item_last_updated,
             "pendency_type": pendency_type,
             "shipment_type": row.get("shipment_type") if "shipment_type" in row else None,
             "emp_name": lookups["emp_map"].get(str(action_user).strip(), ""),
@@ -364,7 +336,7 @@ def enrich_dataframe(df, lookups, report_type):
             "last_destination": last_destination,
             "primary_bin": primary_bin,
             "secondary_bin": secondary_bin,
-            "hour": str(item_last_updated_raw)[11:13] if has_timestamp else None,
+            "hour": str(raw_ts)[11:13] if has_timestamp else None,
             "salvage_type": lookups["exception_salvage"].get(awb, ""),
             "inbound_date": parse_sheet_date(lookups["exception_inbound_date"].get(awb)),
             "block": lookups["exception_block_col"].get(awb, ""),
@@ -373,9 +345,79 @@ def enrich_dataframe(df, lookups, report_type):
     return records
 
 
+def clean_cell(v):
+    if v is None:
+        return ""
+    if isinstance(v, float) and pd.isna(v):
+        return ""
+    if isinstance(v, (dict, list)):
+        return json.dumps(v, ensure_ascii=False)
+    return str(v)
+
+
+def records_to_matrix(records):
+    if not records:
+        return [[]]
+    headers = list(records[0].keys())
+    matrix = [headers]
+    for r in records:
+        matrix.append([clean_cell(r.get(h)) for h in headers])
+    return matrix
+
+
+def write_full_table(sh, title, records, min_cols=30):
+    """Replace a worksheet's data in one logical operation.
+    Data is sent in chunks so a 100k-row audit table stays within request
+    payload limits. This is Google Sheets only.
+    """
+    matrix = records_to_matrix(records)
+    rows_needed = max(len(matrix), 100)
+    cols_needed = max(len(matrix[0]), min_cols)
+    ws = get_or_create_worksheet(sh, title, rows=max(rows_needed, 1000), cols=max(cols_needed, 30))
+
+    if ws.row_count < rows_needed or ws.col_count < cols_needed:
+        ws.resize(rows=max(ws.row_count, rows_needed), cols=max(ws.col_count, cols_needed))
+
+    print(f"Clearing {title}...")
+    ws.clear()
+
+    # Header + data. Use rectangular ranges for reliable writes.
+    total = len(matrix)
+    for start in range(0, total, WRITE_CHUNK):
+        chunk = matrix[start:start + WRITE_CHUNK]
+        end = start + len(chunk)
+        cell_range = f"A{start + 1}:{gspread.utils.rowcol_to_a1(end, len(matrix[0])).replace(str(end), '')}{end}"
+        # rowcol_to_a1 gives e.g. Z500; build the column letter separately.
+        last_col = gspread.utils.rowcol_to_a1(1, len(matrix[0])).rstrip("1")
+        cell_range = f"A{start + 1}:{last_col}{end}"
+        ws.update(range_name=cell_range, values=chunk, raw=True)
+        print(f"  {title}: wrote rows {start + 1}-{end}")
+
+    return ws
+
+
+def write_matrix(sh, title, matrix, clear_first=False, min_rows=100, min_cols=10):
+    if not matrix:
+        return
+    ws = get_or_create_worksheet(
+        sh,
+        title,
+        rows=max(len(matrix), min_rows),
+        cols=max(len(matrix[0]), min_cols),
+    )
+    if ws.row_count < len(matrix) or ws.col_count < len(matrix[0]):
+        ws.resize(rows=max(ws.row_count, len(matrix)), cols=max(ws.col_count, len(matrix[0])))
+    if clear_first:
+        ws.clear()
+    for start in range(0, len(matrix), WRITE_CHUNK):
+        chunk = matrix[start:start + WRITE_CHUNK]
+        end = start + len(chunk)
+        last_col = gspread.utils.rowcol_to_a1(1, len(matrix[0])).rstrip("1")
+        ws.update(range_name=f"A{start + 1}:{last_col}{end}", values=chunk, raw=True)
+    return ws
+
+
 def _ageing_days(val):
-    """Parses an aging_bucket string ("0_day", "3_day", "6+_day") into a
-    plain number for threshold comparisons. Returns None if unparseable."""
     if not val:
         return None
     s = str(val).strip()
@@ -390,46 +432,38 @@ def _ageing_days(val):
 
 
 def is_tracked(val):
-    """1_day and above -- a baseline item_last_updated gets recorded
-    starting here, so a comparison point already exists by the time a
-    shipment reaches the alert-eligible threshold below. Being "tracked"
-    does NOT by itself trigger any notification."""
     days = _ageing_days(val)
     return days is not None and days >= 1
 
 
-def _parse_dt(val):
-    """Parses a timestamp value regardless of exact string shape -- what
-    we write is "YYYY-MM-DD HH:MM:SS" (space), but PostgREST reads a
-    plain `timestamp` column back out as "YYYY-MM-DDTHH:MM:SS" (T). A raw
-    string comparison between those two shapes is unreliable (a space
-    character sorts before 'T', so it could compare wrong regardless of
-    the actual times), so every comparison must go through this parser
-    instead of str(a) > str(b)."""
-    if not val:
-        return None
-    try:
-        return dateutil_parser.parse(str(val).strip())
-    except (ValueError, OverflowError):
-        return None
-
-
 def is_alert_eligible(val):
-    """2_day and above -- only shipments at this ageing level actually
-    trigger a push notification when their item_last_updated changes.
-    1_day shipments are still tracked (see is_tracked) but never alert."""
     days = _ageing_days(val)
     return days is not None and days >= 2
 
 
+def _parse_dt(val):
+    if not val:
+        return None
+    try:
+        dt = dateutil_parser.parse(str(val).strip())
+        # Normalize timezone-aware values to naive UTC so comparisons never
+        # fail because one timestamp has tzinfo and another does not.
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt
+    except (ValueError, OverflowError):
+        return None
+
+
+def _dt_key(val):
+    dt = _parse_dt(val)
+    return dt.timestamp() if dt is not None else float("-inf")
+
+
 def send_update_alert(r):
-    # FWD and REV go to separate ntfy channels so the two don't mix in one
-    # feed. NTFY_TOPIC is FWD's (kept as-is so the existing secret name
-    # doesn't need to change); NTFY_TOPIC_REV is the new one for REV.
     topic = NTFY_TOPIC if r.get("report_type") == "FWD" else NTFY_TOPIC_REV
     if not topic:
-        print(f"  no ntfy topic configured for report_type={r.get('report_type')} -- skipping alert for {r.get('awb_number')}")
-        return
+        return False
 
     def line(label, key):
         return f"{label}: {r.get(key) or '-'}"
@@ -461,413 +495,405 @@ def send_update_alert(r):
             timeout=15,
         )
         print(f"  ntfy status {resp.status_code} for {r.get('awb_number')} (topic={topic})")
+        return resp.ok
     except Exception as e:
-        print(f"  failed to send ntfy alert for {r.get('awb_number')}: {e}")
+        print(f"  ntfy failed for {r.get('awb_number')}: {e}")
+        return False
 
 
-def purge_old_rows(store, table, column="detected_at", days=15):
-    """awb_update_alerts is an append-only log -- without this it grows
-    forever. Keeps only the last `days` days of rows."""
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-    try:
-        store.table(table).delete().lt(column, cutoff).execute()
-        print(f"Purged {table} rows older than {cutoff}.")
-    except Exception as e:
-        print(f"  failed to purge old {table} rows: {e}")
+def read_key_value_sheet(sh, title, key_col=1, value_col=2):
+    rows = read_all_values(sh, title)
+    if len(rows) < 2:
+        return {}
+    out = {}
+    for row in rows[1:]:
+        if len(row) < max(key_col, value_col):
+            continue
+        key = str(row[key_col - 1]).strip()
+        if key:
+            out[key] = row[value_col - 1]
+    return out
 
 
-def check_for_updates_and_alert(store, records):
-    """Tracks item_last_updated for every 1_day+ shipment (so a baseline
-    already exists by the time it reaches 2_day), but only ever sends a
-    notification once a shipment is 2_day+ AND its item_last_updated has
-    genuinely changed since the last run. First sighting of any AWB
-    ALWAYS seeds its baseline silently -- never alerts by itself, no
-    matter its ageing bucket -- otherwise every shipment that newly
-    crosses into the tracked range fires an alert storm in one run."""
+def write_key_value_sheet(sh, title, mapping):
+    rows = [["awb_number", "value"]]
+    for k, v in mapping.items():
+        rows.append([k, clean_cell(v)])
+    write_matrix(sh, title, rows, clear_first=True, min_rows=max(100, len(rows)), min_cols=2)
+
+
+def read_state_rows(sh, title):
+    rows = read_all_values(sh, title)
+    if len(rows) < 2:
+        return {}
+    headers = [str(x).strip() for x in rows[0]]
+    if "awb_number" not in headers:
+        return {}
+    ai = headers.index("awb_number")
+    ti = headers.index("item_last_updated") if "item_last_updated" in headers else None
+    out = {}
+    for row in rows[1:]:
+        if len(row) <= ai:
+            continue
+        awb = str(row[ai]).strip().upper()
+        if not awb:
+            continue
+        out[awb] = row[ti] if ti is not None and len(row) > ti else ""
+    return out
+
+
+def upsert_simple_state(sh, title, rows, headers):
+    """Read current state, merge changes, rewrite the small current-state tab.
+    These tabs contain one row per AWB, so Google Sheets remains manageable.
+    """
+    existing_rows = read_all_values(sh, title)
+    existing = {}
+    if len(existing_rows) >= 2:
+        old_headers = existing_rows[0]
+        try:
+            ai = old_headers.index("awb_number")
+        except ValueError:
+            ai = 0
+        for row in existing_rows[1:]:
+            if len(row) <= ai:
+                continue
+            awb = str(row[ai]).strip().upper()
+            if awb:
+                existing[awb] = dict(zip(old_headers, row + [""] * (len(old_headers) - len(row))))
+
+    for r in rows:
+        awb = str(r.get("awb_number") or "").strip().upper()
+        if awb:
+            existing[awb] = {h: clean_cell(r.get(h)) for h in headers}
+
+    matrix = [headers]
+    for awb, r in existing.items():
+        matrix.append([clean_cell(r.get(h)) for h in headers])
+    write_matrix(sh, title, matrix, clear_first=True, min_rows=max(100, len(matrix)), min_cols=len(headers))
+
+
+def append_rows(sh, title, headers, new_rows):
+    if not new_rows:
+        return
+    ws = get_or_create_worksheet(sh, title, rows=1000, cols=max(len(headers), 10))
+    existing = ws.get_all_values()
+    if not existing:
+        ws.update(range_name=f"A1:{gspread.utils.rowcol_to_a1(1, len(headers)).rstrip('1')}1", values=[headers], raw=True)
+        existing_count = 1
+    else:
+        existing_count = len(existing)
+        if existing[0] != headers:
+            # Do not destroy an existing log with a different header order.
+            print(f"WARNING: {title} header differs; appending using existing header order.")
+            headers = existing[0]
+
+    rows_out = []
+    for r in new_rows:
+        rows_out.append([clean_cell(r.get(h)) for h in headers])
+
+    needed = existing_count + len(rows_out)
+    if ws.row_count < needed:
+        ws.resize(rows=needed, cols=max(ws.col_count, len(headers)))
+
+    for start in range(0, len(rows_out), WRITE_CHUNK):
+        chunk = rows_out[start:start + WRITE_CHUNK]
+        row_start = existing_count + start + 1
+        row_end = row_start + len(chunk) - 1
+        last_col = gspread.utils.rowcol_to_a1(1, len(headers)).rstrip("1")
+        ws.update(range_name=f"A{row_start}:{last_col}{row_end}", values=chunk, raw=True)
+
+
+def check_for_updates_and_alert(sh, records):
     if not NTFY_TOPIC and not NTFY_TOPIC_REV:
-        print("Neither NTFY_TOPIC nor NTFY_TOPIC_REV is set -- skipping update-detection alerts.")
+        print("No NTFY topic configured -- skipping update alerts.")
         return
 
-    tracked_records = [r for r in records if is_tracked(r.get("aging_bucket"))]
-    if not tracked_records:
-        print("No currently-ageing shipments -- nothing to check for updates.")
+    tracked = [r for r in records if is_tracked(r.get("aging_bucket")) and r.get("awb_number")]
+    if not tracked:
+        print("No 1_day+ shipments -- no update checks.")
         return
 
-    unique_records = {}
-    for r in tracked_records:
+    unique = {}
+    for r in tracked:
         awb = r["awb_number"]
-        if awb not in unique_records or str(r.get("item_last_updated") or "") > str(unique_records[awb].get("item_last_updated") or ""):
-            unique_records[awb] = r
-    tracked_records = list(unique_records.values())
+        old = unique.get(awb)
+        if old is None or _dt_key(r.get("item_last_updated")) > _dt_key(old.get("item_last_updated")):
+            unique[awb] = r
+    tracked = list(unique.values())
 
-    awbs = list({r["awb_number"] for r in tracked_records})
-    previous = {}
-    LOOKUP_CHUNK = 200
-    for i in range(0, len(awbs), LOOKUP_CHUNK):
-        chunk = awbs[i:i + LOOKUP_CHUNK]
-        resp = (
-            store.table("awb_last_seen")
-            .select("awb_number,item_last_updated")
-            .in_("awb_number", chunk)
-            .execute()
-        )
-        for row in resp.data:
-            previous[row["awb_number"]] = row["item_last_updated"]
-
-    to_upsert = []
+    previous = read_state_rows(sh, "ALERT_STATE")
+    state_updates = []
+    alert_rows = []
     alerts_sent = 0
 
-    def record_alert(r, awb, current_val):
-        nonlocal alerts_sent
-        send_update_alert(r)
-        alerts_sent += 1
-        to_upsert.append({"awb_number": awb, "item_last_updated": current_val})
-        store.table("awb_update_alerts").insert({
-            "awb_number": awb,
-            "aging_bucket": r.get("aging_bucket"),
-            "pendency_type": r.get("pendency_type"),
-            "report_type": r.get("report_type"),
-            "last_destination": r.get("last_destination"),
-        }).execute()
-        # Findings Status tracking -- one active row per AWB, capturing the
-        # stage it was AT WHEN ALERTED so findings_cleanup.py can later
-        # tell whether it has since progressed (closed) or not (open).
-        # upsert (not insert) so a re-alert on the same AWB just refreshes
-        # this row instead of erroring on a duplicate key.
-        store.table("active_findings").upsert({
-            "awb_number": awb,
-            "report_type": r.get("report_type"),
-            "pendency_type": r.get("pendency_type"),
-            "blocks": r.get("blocks"),
-            "aging_bucket": r.get("aging_bucket"),
-            "seal_number": r.get("seal_number"),
-            "last_destination": r.get("last_destination"),
-        }, on_conflict="awb_number").execute()
-
-    for r in tracked_records:
+    for r in tracked:
         awb = r["awb_number"]
-        current_val = r.get("item_last_updated")
-        prev_val = previous.get(awb)
+        current = r.get("item_last_updated") or ""
+        prev = previous.get(awb)
 
-        if prev_val is None:
-            # Always seed silently on first sighting -- never alert here.
-            to_upsert.append({"awb_number": awb, "item_last_updated": current_val})
+        if not prev:
+            state_updates.append({"awb_number": awb, "item_last_updated": current})
             continue
 
-        if current_val and prev_val and _parse_dt(current_val) and _parse_dt(prev_val) and _parse_dt(current_val) > _parse_dt(prev_val):
-            if is_alert_eligible(r.get("aging_bucket")):
-                record_alert(r, awb, current_val)
-            else:
-                # Genuinely changed, but still only 1_day -- update the
-                # baseline so a repeat check later only alerts on a
-                # further change past this point, without notifying now.
-                to_upsert.append({"awb_number": awb, "item_last_updated": current_val})
+        cur_dt = _parse_dt(current)
+        prev_dt = _parse_dt(prev)
+        changed = cur_dt is not None and prev_dt is not None and cur_dt > prev_dt
 
-    if to_upsert:
-        for i in range(0, len(to_upsert), CHUNK_SIZE):
-            store.table("awb_last_seen").upsert(
-                to_upsert[i:i + CHUNK_SIZE], on_conflict="awb_number"
-            ).execute()
+        if changed and is_alert_eligible(r.get("aging_bucket")):
+            if send_update_alert(r):
+                alerts_sent += 1
+            alert_rows.append({
+                "detected_at": datetime.now(timezone.utc).isoformat(),
+                "awb_number": awb,
+                "aging_bucket": r.get("aging_bucket"),
+                "pendency_type": r.get("pendency_type"),
+                "report_type": r.get("report_type"),
+                "last_destination": r.get("last_destination"),
+                "item_last_updated": current,
+            })
+            state_updates.append({"awb_number": awb, "item_last_updated": current})
+        elif changed:
+            state_updates.append({"awb_number": awb, "item_last_updated": current})
 
-    purge_old_rows(store, "awb_update_alerts")
+    if state_updates:
+        # ALERT_STATE is a current-state sheet; rewrite only one compact table.
+        current = previous.copy()
+        for r in state_updates:
+            current[r["awb_number"]] = r["item_last_updated"]
+        write_key_value_sheet(sh, "ALERT_STATE", current)
 
-    print(f"Update-detection: checked {len(tracked_records)} tracked shipments, sent {alerts_sent} alerts.")
+    append_rows(
+        sh,
+        "AWB_UPDATE_ALERTS",
+        ["detected_at", "awb_number", "aging_bucket", "pendency_type", "report_type", "last_destination", "item_last_updated"],
+        alert_rows,
+    )
+
+    print(f"Update detection: checked {len(tracked)}, sent {alerts_sent} alerts.")
 
 
-# FWD-only: CLIENT Warehouse and BRSNR are two different categories but the
-# same physical step ("PFC"); Received at DC is "RDC" (bin distinguished by
-# bin_level); At Dock is the final step before a shipment clears out of
-# pendency entirely. REV doesn't follow this flow, so stage-tracking is
-# scoped to report_type == "FWD" only.
-FWD_PFC_TYPES = {"CLIENT Warehouse", "BRSNR"}
-
-
-def _fetch_awb_time_map(store, table, time_column):
-    """Small tables only (currently-at-RDC / currently-at-Dock shipments,
-    not the full historical volume) -- cheap to fetch every run. Returns
-    {awb_number: last_recorded_time} so callers can detect a genuinely
-    NEW scan (item_last_updated moved forward) vs. the same snapshot
-    being re-observed by this run's poll."""
-    times = {}
-    start = 0
-    PAGE = 1000
-    while True:
-        resp = store.table(table).select(f"awb_number, {time_column}").range(start, start + PAGE - 1).execute()
-        for row in resp.data:
-            times[row["awb_number"]] = row.get(time_column)
-        if len(resp.data) < PAGE:
-            break
-        start += PAGE
-    return times
+def read_current_stage_state(sh, title, time_field):
+    rows = read_all_values(sh, title)
+    if len(rows) < 2:
+        return {}
+    headers = rows[0]
+    try:
+        ai = headers.index("awb_number")
+        ti = headers.index(time_field)
+    except ValueError:
+        return {}
+    out = {}
+    for row in rows[1:]:
+        if len(row) <= ai:
+            continue
+        awb = str(row[ai]).strip().upper()
+        if awb:
+            out[awb] = row[ti] if len(row) > ti else ""
+    return out
 
 
 def _is_new_scan(new_time, prev_time):
-    """True if this is a genuinely fresh scan -- either the AWB wasn't
-    tracked before at all, or its item_last_updated has moved forward
-    since we last recorded it. This is what lets a re-scan of a
-    shipment that never left RDC still count (the WMS bumps
-    item_last_updated on every real scan action, even when the
-    category/bin doesn't change), while a repeat poll of the exact same
-    unchanged snapshot does NOT get double-counted."""
-    if prev_time is None:
+    if not prev_time:
         return True
     nt, pt = _parse_dt(new_time), _parse_dt(prev_time)
-    if nt is None or pt is None:
-        return False
-    return nt > pt
+    return nt is not None and pt is not None and nt > pt
 
 
-def log_primary_secondary_events(store, records):
-    """Classify FWD shipments by bin_level and record genuine scan events.
+def log_primary_secondary_events(sh, records):
+    existing_primary = read_current_stage_state(sh, "RDC_LAST_SEEN", "rdc_time")
+    existing_secondary = read_current_stage_state(sh, "AT_DOCK_LAST_SEEN", "at_dock_time")
 
-    IMPORTANT D1 FREE-TIER OPTIMIZATION:
-      - rdc_last_seen / at_dock_last_seen are only UPSERTed when the AWB is
-        new or its item_last_updated timestamp actually changed.
-      - The old version UPSERTed every currently tracked AWB on every 15-minute
-        run. Even when the values were identical, those writes could consume
-        the D1 daily row-write quota.
-      - primary_scan_events / secondary_scan_events remain append-only because
-        a genuine timestamp change represents a real scan and must be counted.
-      - AWBs that leave bin 1/bin 2 are still deleted from the corresponding
-        tracking table so they can be detected again if they later return.
-
-    bin_level == "1" -> Primary
-    bin_level == "2" -> Secondary
-    """
-    existing_primary = _fetch_awb_time_map(store, "rdc_last_seen", "rdc_time")
-    existing_secondary = _fetch_awb_time_map(store, "at_dock_last_seen", "at_dock_time")
-
-    current_primary = set()
-    current_secondary = set()
-    primary_rows = []
-    secondary_rows = []
-    primary_track_rows = []
-    secondary_track_rows = []
-
-    # Keep only one current record per AWB. If the source contains duplicate
-    # rows, use the record with the newest item_last_updated timestamp.
-    current_primary_records = {}
-    current_secondary_records = {}
+    current_primary = {}
+    current_secondary = {}
 
     for r in records:
         if r.get("report_type") != "FWD":
             continue
-
-        awb = str(r.get("awb_number") or "").strip()
+        awb = str(r.get("awb_number") or "").strip().upper()
         if not awb:
             continue
+        ts = r.get("item_last_updated")
+        level = str(r.get("bin_level") or "").strip()
+        if level == "2":
+            old = current_secondary.get(awb)
+            if old is None or (_parse_dt(ts) or datetime.min) > (_parse_dt(old.get("item_last_updated")) or datetime.min):
+                current_secondary[awb] = r
+        elif level == "1":
+            old = current_primary.get(awb)
+            if old is None or (_parse_dt(ts) or datetime.min) > (_parse_dt(old.get("item_last_updated")) or datetime.min):
+                current_primary[awb] = r
 
-        bin_level = str(r.get("bin_level") or "").strip()
+    primary_events = []
+    secondary_events = []
+    primary_state = []
+    secondary_state = []
 
-        if bin_level == "2":
-            old = current_secondary_records.get(awb)
-            if old is None or str(r.get("item_last_updated") or "") > str(old.get("item_last_updated") or ""):
-                current_secondary_records[awb] = r
-        elif bin_level == "1":
-            old = current_primary_records.get(awb)
-            if old is None or str(r.get("item_last_updated") or "") > str(old.get("item_last_updated") or ""):
-                current_primary_records[awb] = r
-
-    # PRIMARY / BIN 1
-    for awb, r in current_primary_records.items():
-        current_primary.add(awb)
-        new_time = r.get("item_last_updated")
-        previous_time = existing_primary.get(awb)
-
-        # Event log: only a genuinely new/fresh scan creates a historical row.
-        if _is_new_scan(new_time, previous_time):
-            primary_rows.append({
+    for awb, r in current_primary.items():
+        ts = r.get("item_last_updated")
+        if _is_new_scan(ts, existing_primary.get(awb)):
+            primary_events.append({
                 "awb_number": awb,
                 "action_user": r.get("action_user"),
                 "emp_name": r.get("emp_name"),
                 "client_name": r.get("client_name"),
                 "layout_name": r.get("layout_name"),
                 "blocks": r.get("blocks"),
-                "occurred_at": new_time,
+                "occurred_at": ts,
             })
+        primary_state.append({"awb_number": awb, "rdc_time": ts, "bin_level": "1"})
 
-        # CRITICAL FIX: do NOT upsert an unchanged row every pipeline run.
-        # Only write when the tracking value is actually new/changed.
-        if previous_time is None or (
-            new_time is not None
-            and _parse_dt(new_time) is not None
-            and _parse_dt(previous_time) is not None
-            and _parse_dt(new_time) > _parse_dt(previous_time)
-        ):
-            primary_track_rows.append({
-                "awb_number": awb,
-                "rdc_time": new_time,
-                "bin_level": "1",
-            })
-
-    # SECONDARY / BIN 2
-    for awb, r in current_secondary_records.items():
-        current_secondary.add(awb)
-        new_time = r.get("item_last_updated")
-        previous_time = existing_secondary.get(awb)
-
-        if _is_new_scan(new_time, previous_time):
-            secondary_rows.append({
+    for awb, r in current_secondary.items():
+        ts = r.get("item_last_updated")
+        if _is_new_scan(ts, existing_secondary.get(awb)):
+            secondary_events.append({
                 "awb_number": awb,
                 "action_user": r.get("action_user"),
                 "emp_name": r.get("emp_name"),
                 "client_name": r.get("client_name"),
                 "layout_name": r.get("layout_name"),
                 "blocks": r.get("blocks"),
-                "occurred_at": new_time,
+                "occurred_at": ts,
             })
+        secondary_state.append({"awb_number": awb, "at_dock_time": ts})
 
-        # Same D1-write optimization for the Secondary tracking table.
-        if previous_time is None or (
-            new_time is not None
-            and _parse_dt(new_time) is not None
-            and _parse_dt(previous_time) is not None
-            and _parse_dt(new_time) > _parse_dt(previous_time)
-        ):
-            secondary_track_rows.append({
-                "awb_number": awb,
-                "at_dock_time": new_time,
-            })
+    pfc_rows = []
+    existing_pfc = read_state_rows(sh, "PFC_FIRST_SEEN")
+    for r in records:
+        if r.get("report_type") == "FWD" and (r.get("pendency_type") or "").strip() in FWD_PFC_TYPES:
+            awb = str(r.get("awb_number") or "").strip().upper()
+            if awb and awb not in existing_pfc:
+                pfc_rows.append({
+                    "awb_number": awb,
+                    "first_seen_at": r.get("item_last_updated"),
+                    "pendency_type": r.get("pendency_type"),
+                })
 
-    pfc_rows = [
-        {
-            "awb_number": r["awb_number"],
-            "first_seen_at": r.get("item_last_updated"),
-            "pendency_type": r.get("pendency_type"),
-        }
-        for r in records
-        if r.get("report_type") == "FWD"
-        and (r.get("pendency_type") or "").strip() in FWD_PFC_TYPES
-    ]
-
-    rdc_to_clear = list(existing_primary.keys() - current_primary)
-    at_dock_to_clear = list(existing_secondary.keys() - current_secondary)
-
-    # Historical event rows are intentionally plain INSERTs: every genuine
-    # new scan must remain available for counting/audit purposes.
-    if primary_rows:
-        for i in range(0, len(primary_rows), CHUNK_SIZE):
-            store.table("primary_scan_events").insert(
-                primary_rows[i:i + CHUNK_SIZE]
-            ).execute()
-
-    if secondary_rows:
-        for i in range(0, len(secondary_rows), CHUNK_SIZE):
-            store.table("secondary_scan_events").insert(
-                secondary_rows[i:i + CHUNK_SIZE]
-            ).execute()
-
-    # First-seen PFC is intentionally ignore-duplicate. Existing AWBs do not
-    # need to be rewritten.
-    if pfc_rows:
-        for i in range(0, len(pfc_rows), CHUNK_SIZE):
-            store.table("pfc_first_seen").upsert(
-                pfc_rows[i:i + CHUNK_SIZE],
-                on_conflict="awb_number",
-                ignore_duplicates=True,
-            ).execute()
-
-    # FIX: these writes are now incremental instead of rewriting every
-    # currently active shipment on every 15-minute pipeline run.
-    if primary_track_rows:
-        for i in range(0, len(primary_track_rows), CHUNK_SIZE):
-            store.table("rdc_last_seen").upsert(
-                primary_track_rows[i:i + CHUNK_SIZE],
-                on_conflict="awb_number",
-            ).execute()
-
-    if secondary_track_rows:
-        for i in range(0, len(secondary_track_rows), CHUNK_SIZE):
-            store.table("at_dock_last_seen").upsert(
-                secondary_track_rows[i:i + CHUNK_SIZE],
-                on_conflict="awb_number",
-            ).execute()
-
-    # Remove shipments that are no longer in the corresponding bin. These
-    # deletes are necessary because the tables represent CURRENT state, not
-    # historical state. They are normally small and happen only when an AWB
-    # leaves the stage.
-    if rdc_to_clear:
-        for i in range(0, len(rdc_to_clear), 200):
-            store.table("rdc_last_seen").delete().in_(
-                "awb_number", rdc_to_clear[i:i + 200]
-            ).execute()
-
-    if at_dock_to_clear:
-        for i in range(0, len(at_dock_to_clear), 200):
-            store.table("at_dock_last_seen").delete().in_(
-                "awb_number", at_dock_to_clear[i:i + 200]
-            ).execute()
-
-    purge_old_rows(store, "primary_scan_events", column="occurred_at")
-    purge_old_rows(store, "secondary_scan_events", column="occurred_at")
-
-    print(
-        f"Scan events: {len(primary_rows)} new primary, "
-        f"{len(secondary_rows)} new secondary, "
-        f"{len(pfc_rows)} PFC rows, "
-        f"{len(primary_track_rows)} Primary tracking WRITES, "
-        f"{len(secondary_track_rows)} Secondary tracking WRITES, "
-        f"{len(rdc_to_clear)} left RDC, "
-        f"{len(at_dock_to_clear)} left At Dock."
+    append_rows(
+        sh,
+        "PRIMARY_SCAN_EVENTS",
+        ["awb_number", "action_user", "emp_name", "client_name", "layout_name", "blocks", "occurred_at"],
+        primary_events,
     )
+    append_rows(
+        sh,
+        "SECONDARY_SCAN_EVENTS",
+        ["awb_number", "action_user", "emp_name", "client_name", "layout_name", "blocks", "occurred_at"],
+        secondary_events,
+    )
+    append_rows(
+        sh,
+        "PFC_FIRST_SEEN",
+        ["awb_number", "first_seen_at", "pendency_type"],
+        pfc_rows,
+    )
+
+    # Current-stage sheets are fully replaced each run, which is correct because
+    # they represent CURRENT bin state, not history.
+    write_matrix(
+        sh,
+        "RDC_LAST_SEEN",
+        [["awb_number", "rdc_time", "bin_level"]] + [[r["awb_number"], r["rdc_time"], r["bin_level"]] for r in primary_state],
+        clear_first=True,
+        min_rows=max(100, len(primary_state) + 1),
+        min_cols=3,
+    )
+    write_matrix(
+        sh,
+        "AT_DOCK_LAST_SEEN",
+        [["awb_number", "at_dock_time"]] + [[r["awb_number"], r["at_dock_time"]] for r in secondary_state],
+        clear_first=True,
+        min_rows=max(100, len(secondary_state) + 1),
+        min_cols=2,
+    )
+
+    print(f"Scan events: {len(primary_events)} new primary, {len(secondary_events)} new secondary, {len(pfc_rows)} new PFC first-seen.")
+
+
+def sync_load_pending_summary(sh, ref):
+    records = []
+
+    def to_num(v):
+        try:
+            return int(str(v).replace(",", "").strip())
+        except (ValueError, TypeError):
+            return None
+
+    for tab_name in LOAD_PENDING_SHEETS:
+        rows = ref.get(tab_name, [])
+        if len(rows) < 5:
+            continue
+        shipment_row = rows[1]
+        vehicle_row = rows[2]
+        header_row = rows[4]
+        for col_idx in range(1, len(header_row)):
+            label = str(header_row[col_idx]).strip()
+            if not label:
+                continue
+            records.append({
+                "sheet_name": tab_name,
+                "status_label": label,
+                "shipment_count": to_num(shipment_row[col_idx] if col_idx < len(shipment_row) else ""),
+                "vehicle_count": to_num(vehicle_row[col_idx] if col_idx < len(vehicle_row) else ""),
+            })
+
+    if records:
+        write_matrix(
+            sh,
+            "LOAD_PENDING_SUMMARY",
+            records_to_matrix(records),
+            clear_first=True,
+            min_rows=max(100, len(records) + 1),
+            min_cols=4,
+        )
+        print(f"Load Pending: wrote {len(records)} summary rows to Google Sheets.")
 
 
 def main():
-    captured_at = datetime.now(timezone.utc).isoformat()
-    store = CFStore()
+    started = datetime.now(timezone.utc).isoformat()
+    print(f"Run started: {started}")
+    print("MODE: GOOGLE SHEETS ONLY — NO CLOUDFLARE / D1")
 
-    print("Loading reference sheets from Google Sheets...")
-    ref = load_reference_sheets()
+    sh = get_sheet()
+
+    print("Reading FWD_RAW + REV_RAW + reference tabs from PENDENCY MASTER...")
+    ref = load_reference_sheets(sh)
     lookups = build_lookup_maps(ref)
 
-    fwd_present = os.path.exists(FWD_CSV_PATH)
-    rev_present = os.path.exists(REV_CSV_PATH)
+    fwd_rows = ref["FWD_RAW"]
+    rev_rows = ref["REV_RAW"]
 
-    if not fwd_present or not rev_present:
-        # audit_master is one shared table -- rebuilding it from only one
-        # side would wipe out the other side's rows entirely (the truncate
-        # clears everything). Safer to skip the rebuild this run and keep
-        # the last complete version than to replace it with an incomplete
-        # one. fwd/rev_pendency_current are unaffected by this -- those
-        # already updated correctly in upload_to_store.py.
-        missing = "FWD" if not fwd_present else "REV"
-        print(f"{missing} file missing this run -- skipping audit_master rebuild "
-              f"to avoid wiping the other side. Keeping the last complete version.")
-        return
+    if len(fwd_rows) < 2 or len(rev_rows) < 2:
+        raise RuntimeError("FWD_RAW or REV_RAW has no data rows; refusing to overwrite AUDIT_MASTER.")
 
     records = []
-    print(f"Reading {FWD_CSV_PATH}...")
-    fwd_df = pd.read_csv(FWD_CSV_PATH, dtype=str, na_values=["\\N"], keep_default_na=True)
+
+    print(f"Reading FWD_RAW: {len(fwd_rows) - 1} rows...")
+    fwd_df = pd.DataFrame(fwd_rows[1:], columns=fwd_rows[0], dtype=str)
     print("Enriching FWD rows...")
-    records += enrich_dataframe(fwd_df, lookups, "FWD")
+    records.extend(enrich_dataframe(fwd_df, lookups, "FWD"))
 
-    print(f"Reading {REV_CSV_PATH}...")
-    rev_df = pd.read_csv(REV_CSV_PATH, dtype=str, na_values=["\\N"], keep_default_na=True)
+    print(f"Reading REV_RAW: {len(rev_rows) - 1} rows...")
+    rev_df = pd.DataFrame(rev_rows[1:], columns=rev_rows[0], dtype=str)
     print("Enriching REV rows...")
-    records += enrich_dataframe(rev_df, lookups, "REV")
+    records.extend(enrich_dataframe(rev_df, lookups, "REV"))
 
+    captured_at = datetime.now(timezone.utc).isoformat()
     for r in records:
         r["captured_at"] = captured_at
-    records = [{k: (None if pd.isna(v) else v) for k, v in r.items()} for r in records]
 
-    total = len(records)
-    print(f"Writing {total} audit_master rows to compressed KV snapshot...")
-    put_json("audit_master.json.gz", records)
+    print(f"Writing {len(records)} AUDIT_MASTER rows to Google Sheets...")
+    write_full_table(sh, "AUDIT_MASTER", records, min_cols=30)
 
-    print("\nChecking for shipment updates...")
-    check_for_updates_and_alert(store, records)
+    print("Checking shipment update alerts...")
+    check_for_updates_and_alert(sh, records)
 
-    print("\nLogging Primary/Secondary scan events...")
-    log_primary_secondary_events(store, records)
+    print("Logging Primary/Secondary scan events...")
+    log_primary_secondary_events(sh, records)
 
-    print("\nSyncing Load Pending summary (SDD/AIR/NDD LOAD tabs)...")
-    try:
-        sync_load_pending_summary(store)
-    except Exception as e:
-        print(f"  Load Pending sync failed (non-critical, leaving previous data): {e}")
+    print("Syncing Load Pending summary...")
+    sync_load_pending_summary(sh, ref)
 
-    print("Done.")
+    print("DONE — no Cloudflare write performed by build_audit_master.py")
 
 
 if __name__ == "__main__":
