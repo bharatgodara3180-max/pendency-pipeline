@@ -577,7 +577,13 @@ def append_rows(sh, title, headers, new_rows):
         return
     ws = get_or_create_worksheet(sh, title, rows=1000, cols=max(len(headers), 10))
     existing = ws.get_all_values()
-    if not existing:
+    # A tab with no rows at all, OR a header row that is blank/corrupted
+    # (all cells empty), is treated the same: "no header yet". Previously
+    # only the "no rows at all" case was handled, so a blanked-out header
+    # row fell through to `headers = existing[0]` == [], and
+    # gspread.utils.rowcol_to_a1(1, 0) below crashed with
+    # IncorrectCellLabel: (1, 0). This is that fix.
+    if not existing or not any(str(c).strip() for c in existing[0]):
         ws.update(range_name=f"A1:{gspread.utils.rowcol_to_a1(1, len(headers)).rstrip('1')}1", values=[headers], raw=True)
         existing_count = 1
     else:
