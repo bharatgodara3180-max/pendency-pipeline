@@ -20,7 +20,6 @@ Outputs/state (same workbook):
 NTFY alerts remain direct HTTP calls and do not use Cloudflare.
 """
 
-import json
 import os
 import sys
 from datetime import datetime, timedelta, timezone
@@ -29,9 +28,8 @@ import gspread
 import pandas as pd
 import requests
 from dateutil import parser as dateutil_parser
-from google.oauth2.service_account import Credentials
+from google.auth import default as google_auth_default
 
-GOOGLE_SERVICE_ACCOUNT_JSON = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
 AUDIT_SHEET_ID = os.environ.get("AUDIT_SHEET_ID")
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC")
 NTFY_TOPIC_REV = os.environ.get("NTFY_TOPIC_REV")
@@ -44,15 +42,17 @@ AT_DOCKBRSNR_CATEGORIES = {"IN BAG / At Dock", "IN BAG / BRSNR"}
 FWD_PFC_TYPES = {"CLIENT Warehouse", "BRSNR"}
 LOAD_PENDING_SHEETS = ["SDD LOAD", "AIR LOAD", "NDD LOAD"]
 
-if not GOOGLE_SERVICE_ACCOUNT_JSON or not AUDIT_SHEET_ID:
-    sys.exit("Missing GOOGLE_SERVICE_ACCOUNT_JSON or AUDIT_SHEET_ID")
+if not AUDIT_SHEET_ID:
+    sys.exit("Missing AUDIT_SHEET_ID")
 
 
 def get_google_client():
-    info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
-    creds = Credentials.from_service_account_info(
-        info,
-        scopes=["https://www.googleapis.com/auth/spreadsheets"],
+    # GitHub Actions authenticates with Workload Identity Federation.
+    # google-github-actions/auth exposes those short-lived credentials as
+    # Application Default Credentials (ADC), so no service-account JSON secret
+    # is required.
+    creds, _ = google_auth_default(
+        scopes=["https://www.googleapis.com/auth/spreadsheets"]
     )
     return gspread.authorize(creds)
 
