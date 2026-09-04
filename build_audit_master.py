@@ -15,6 +15,7 @@ Known, deliberately-preserved quirks carried over from the original sheet
     formula's condition can never be true, so it never takes the other branch.
 """
 
+import json
 import os
 import sys
 from datetime import datetime, timedelta, timezone
@@ -23,96 +24,63 @@ import gspread
 import pandas as pd
 import requests
 from dateutil import parser as dateutil_parser
-from google.auth import default as google_auth_default
+from google.oauth2.service_account import Credentials
+from cf_store import CFStore, put_json
 
+CF_API_URL = os.environ.get("CF_API_URL")
+CF_API_TOKEN = os.environ.get("CF_API_TOKEN")
+GOOGLE_SERVICE_ACCOUNT_JSON = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
 AUDIT_SHEET_ID = os.environ.get("AUDIT_SHEET_ID")
 FWD_CSV_PATH = os.environ.get("FWD_CSV_PATH", "fwd_pendency.csv")
 REV_CSV_PATH = os.environ.get("REV_CSV_PATH", "rev_pendency.csv")
-CHUNK_SIZE = 5000  # Google Sheets write chunk; keeps write-request count low
+CHUNK_SIZE = 500  # was 500 -- fewer, larger requests to cut total run time
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC")           # FWD alerts
 NTFY_TOPIC_REV = os.environ.get("NTFY_TOPIC_REV")    # REV alerts -- separate channel
 
-if not AUDIT_SHEET_ID:
-    sys.exit("Missing AUDIT_SHEET_ID")
+if not all([CF_API_URL, CF_API_TOKEN, GOOGLE_SERVICE_ACCOUNT_JSON, AUDIT_SHEET_ID]):
+    sys.exit(
+        "Missing one of: CF_API_URL, CF_API_TOKEN, "
+        "GOOGLE_SERVICE_ACCOUNT_JSON, AUDIT_SHEET_ID"
+    )
 
 # Category -> which enrichment rules apply, confirmed against the real sheet.
 RDCPFC_CATEGORIES = {"NOT IN BAG / Received at DC", "CLIENT Warehouse"}
 AT_DOCKBRSNR_CATEGORIES = {"IN BAG / At Dock", "IN BAG / BRSNR"}
 
 
-# All Google-Sheet data needed by the audit build is fetched in one
-# values.batchGet request per pipeline run. The download step has already
-# replaced FWD_RAW/REV_RAW in this same workbook.
-SHEET_VALUES_CACHE = {}
-
-
 def load_reference_sheets():
-    """Read all required Google Sheet tabs in ONE values.batchGet call.
-
-    IMPORTANT: this function is READ-ONLY. This script reads FWD/REV and reference tabs, then writes the enriched
-    AUDIT_MASTER and tracking/state tabs back into the same Google Spreadsheet.
-    No Cloudflare storage is used.
-    """
-    creds, _ = google_auth_default(
-        scopes=["https://www.googleapis.com/auth/spreadsheets"]
+    creds_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
+    creds = Credentials.from_service_account_info(
+        creds_info,
+        scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"],
     )
     gc = gspread.authorize(creds)
     sh = gc.open_by_key(AUDIT_SHEET_ID)
 
-    tab_names = [
-        "FWD_RAW",
-        "REV_RAW",
-        "EXCEPTION",
-        "Layout Name Block Wise",
-        "MAPPING",
-        "EMP_DATA",
-        "Stagging",
-        "SDD LOAD",
-        "AIR LOAD",
-        "NDD LOAD",
-    ]
-    ranges = [f"'{name}'!A:ZZ" for name in tab_names]
-
-    try:
-        response = sh.values_batch_get(ranges)
-    except Exception as e:
-        raise RuntimeError(f"Could not read PENDENCY MASTER tabs: {e}") from e
-
-    value_ranges = response.get("valueRanges", [])
-    values_by_tab = {}
-    for name, vr in zip(tab_names, value_ranges):
-        values_by_tab[name] = vr.get("values", [])
-
-    SHEET_VALUES_CACHE.clear()
-    SHEET_VALUES_CACHE.update(values_by_tab)
-
-    def required_rows(tab_name):
-        rows = values_by_tab.get(tab_name, [])
-        if not rows:
-            raise RuntimeError(
-                f"Required worksheet '{tab_name}' is empty or missing. "
-                "Do not create PRIMARY_SCAN_EVENTS/SECONDARY_SCAN_EVENTS tabs; "
-                "only the existing pipeline/reference tabs are required."
-            )
-        return rows
+    def rows(tab_name, required=True):
+        try:
+            return sh.worksheet(tab_name).get_all_values()
+        except gspread.exceptions.WorksheetNotFound:
+            if required:
+                raise
+            print(f"WARNING: worksheet '{tab_name}' not found -- skipping (non-critical).")
+            return []
 
     return {
-        "EXCEPTION": required_rows("EXCEPTION"),
-        "Layout Name Block Wise": required_rows("Layout Name Block Wise"),
-        "MAPPING": required_rows("MAPPING"),
-        "EMP_DATA": required_rows("EMP_DATA"),
-        "Stagging": required_rows("Stagging"),
-        "FWD_RAW": required_rows("FWD_RAW"),
-        "REV_RAW": required_rows("REV_RAW"),
+        "EXCEPTION": rows("EXCEPTION"),
+        "Layout Name Block Wise": rows("Layout Name Block Wise"),
+        "MAPPING": rows("MAPPING"),
+        "EMP_DATA": rows("EMP_DATA"),
+        "Stagging": rows("Stagging"),
     }
-
 
 LOAD_PENDING_SHEETS = ["SDD LOAD", "AIR LOAD", "NDD LOAD"]
 
 
 def sync_load_pending_summary(store):
     """Reads the 3 Vehicle-Pending tabs (SDD/AIR/NDD LOAD) from the same
-    mapping Google Sheet and mirrors their summary rows into for local processing only. Same layout on every tab:
+    mapping Google Sheet and mirrors their summary rows into store for
+    the TV view's "Load Pending" screen. Same layout on every tab:
       row 2 = SHIPMENT COUNT, row 3 = VEHICLE COUNT, row 5 = status labels
       (Delivered / Intransit / No Load / Vehicle placed; Departure
       pending / Grand Total / ...), column A is just the "VEHICLE NO."
@@ -120,6 +88,13 @@ def sync_load_pending_summary(store):
       -- nothing about the exact column layout is hardcoded, only the
       row numbers (2/3/5) are fixed, since that's the one thing confirmed
       identical across all three tabs."""
+    creds_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
+    creds = Credentials.from_service_account_info(
+        creds_info, scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"]
+    )
+    gc = gspread.authorize(creds)
+    sh = gc.open_by_key(AUDIT_SHEET_ID)
+
     def to_num(v):
         try:
             return int(str(v).replace(",", "").strip())
@@ -128,9 +103,10 @@ def sync_load_pending_summary(store):
 
     records = []
     for tab_name in LOAD_PENDING_SHEETS:
-        rows = SHEET_VALUES_CACHE.get(tab_name, [])
-        if not rows:
-            print(f"WARNING: Load Pending worksheet '{tab_name}' missing/empty -- skipping.")
+        try:
+            rows = sh.worksheet(tab_name).get_all_values()
+        except gspread.exceptions.WorksheetNotFound:
+            print(f"WARNING: Load Pending worksheet '{tab_name}' not found -- skipping.")
             continue
         if len(rows) < 5:
             print(f"WARNING: '{tab_name}' has fewer than 5 rows -- skipping.")
@@ -157,7 +133,8 @@ def sync_load_pending_summary(store):
         print("Load Pending: nothing read from any tab -- leaving existing data as-is.")
         return
 
-    print(f"Load Pending: read {len(records)} summary rows. No Cloudflare write performed.")
+    put_json("load_pending_summary.json.gz", records)
+    print(f"Load Pending: synced {len(records)} rows across {len(LOAD_PENDING_SHEETS)} tabs to KV.")
 
 
 def build_lookup_maps(ref):
@@ -488,97 +465,150 @@ def send_update_alert(r):
         print(f"  failed to send ntfy alert for {r.get('awb_number')}: {e}")
 
 
-
-def _sheet_col(n):
-    s = ""
-    while n:
-        n, rem = divmod(n - 1, 26)
-        s = chr(65 + rem) + s
-    return s
-
-
-def _get_spreadsheet():
-    creds, _ = google_auth_default(
-        scopes=["https://www.googleapis.com/auth/spreadsheets"]
-    )
-    gc = gspread.authorize(creds)
-    return gc.open_by_key(AUDIT_SHEET_ID)
-
-
-def _get_or_create_worksheet(sh, title, rows=1000, cols=30):
+def purge_old_rows(store, table, column="detected_at", days=15):
+    """awb_update_alerts is an append-only log -- without this it grows
+    forever. Keeps only the last `days` days of rows."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     try:
-        ws = sh.worksheet(title)
-    except gspread.exceptions.WorksheetNotFound:
-        print(f"Creating worksheet: {title}")
-        ws = sh.add_worksheet(title=title, rows=max(rows, 100), cols=max(cols, 10))
-    return ws
+        store.table(table).delete().lt(column, cutoff).execute()
+        print(f"Purged {table} rows older than {cutoff}.")
+    except Exception as e:
+        print(f"  failed to purge old {table} rows: {e}")
 
 
-def write_records_to_sheet(sh, title, records, chunk_size=5000):
-    """Replace a worksheet in a small number of batch value writes.
-
-    The previous implementation wrote the ~97k-row AUDIT_MASTER to Cloudflare
-    and wrote other state to a database. This version keeps the complete
-    enriched AUDIT_MASTER in the same PENDENCY MASTER Google Spreadsheet.
-    5,000-row chunks keep the number of Sheets write requests low enough to
-    avoid the 60 writes/minute quota that the old 500-row implementation hit.
-    """
-    if not records:
-        print(f"{title}: no rows to write.")
+def check_for_updates_and_alert(store, records):
+    """Tracks item_last_updated for every 1_day+ shipment (so a baseline
+    already exists by the time it reaches 2_day), but only ever sends a
+    notification once a shipment is 2_day+ AND its item_last_updated has
+    genuinely changed since the last run. First sighting of any AWB
+    ALWAYS seeds its baseline silently -- never alerts by itself, no
+    matter its ageing bucket -- otherwise every shipment that newly
+    crosses into the tracked range fires an alert storm in one run."""
+    if not NTFY_TOPIC and not NTFY_TOPIC_REV:
+        print("Neither NTFY_TOPIC nor NTFY_TOPIC_REV is set -- skipping update-detection alerts.")
         return
 
-    headers = list(records[0].keys())
-    matrix = [headers]
-    for r in records:
-        matrix.append([None if pd.isna(r.get(h)) else r.get(h) for h in headers])
+    tracked_records = [r for r in records if is_tracked(r.get("aging_bucket"))]
+    if not tracked_records:
+        print("No currently-ageing shipments -- nothing to check for updates.")
+        return
 
-    ws = _get_or_create_worksheet(sh, title, rows=len(matrix), cols=len(headers))
-    ws.resize(rows=max(len(matrix), 1), cols=max(len(headers), 1))
-    ws.clear()
+    unique_records = {}
+    for r in tracked_records:
+        awb = r["awb_number"]
+        if awb not in unique_records or str(r.get("item_last_updated") or "") > str(unique_records[awb].get("item_last_updated") or ""):
+            unique_records[awb] = r
+    tracked_records = list(unique_records.values())
 
-    last_col = _sheet_col(len(headers))
-    total = len(matrix)
-    print(f"{title}: writing {total - 1} data rows in chunks of {chunk_size}...")
-    for start in range(0, total, chunk_size):
-        end = min(start + chunk_size, total)
-        rng = f"A{start + 1}:{last_col}{end}"
-        ws.update(rng, matrix[start:end], raw=True)
-        if start == 0 or end == total or end % (chunk_size * 5) == 0:
-            print(f"{title}: wrote rows {start + 1}-{end}")
+    awbs = list({r["awb_number"] for r in tracked_records})
+    previous = {}
+    LOOKUP_CHUNK = 200
+    for i in range(0, len(awbs), LOOKUP_CHUNK):
+        chunk = awbs[i:i + LOOKUP_CHUNK]
+        resp = (
+            store.table("awb_last_seen")
+            .select("awb_number,item_last_updated")
+            .in_("awb_number", chunk)
+            .execute()
+        )
+        for row in resp.data:
+            previous[row["awb_number"]] = row["item_last_updated"]
+
+    to_upsert = []
+    alerts_sent = 0
+
+    def record_alert(r, awb, current_val):
+        nonlocal alerts_sent
+        send_update_alert(r)
+        alerts_sent += 1
+        to_upsert.append({"awb_number": awb, "item_last_updated": current_val})
+        store.table("awb_update_alerts").insert({
+            "awb_number": awb,
+            "aging_bucket": r.get("aging_bucket"),
+            "pendency_type": r.get("pendency_type"),
+            "report_type": r.get("report_type"),
+            "last_destination": r.get("last_destination"),
+        }).execute()
+        # Findings Status tracking -- one active row per AWB, capturing the
+        # stage it was AT WHEN ALERTED so findings_cleanup.py can later
+        # tell whether it has since progressed (closed) or not (open).
+        # upsert (not insert) so a re-alert on the same AWB just refreshes
+        # this row instead of erroring on a duplicate key.
+        store.table("active_findings").upsert({
+            "awb_number": awb,
+            "report_type": r.get("report_type"),
+            "pendency_type": r.get("pendency_type"),
+            "blocks": r.get("blocks"),
+            "aging_bucket": r.get("aging_bucket"),
+            "seal_number": r.get("seal_number"),
+            "last_destination": r.get("last_destination"),
+        }, on_conflict="awb_number").execute()
+
+    for r in tracked_records:
+        awb = r["awb_number"]
+        current_val = r.get("item_last_updated")
+        prev_val = previous.get(awb)
+
+        if prev_val is None:
+            # Always seed silently on first sighting -- never alert here.
+            to_upsert.append({"awb_number": awb, "item_last_updated": current_val})
+            continue
+
+        if current_val and prev_val and _parse_dt(current_val) and _parse_dt(prev_val) and _parse_dt(current_val) > _parse_dt(prev_val):
+            if is_alert_eligible(r.get("aging_bucket")):
+                record_alert(r, awb, current_val)
+            else:
+                # Genuinely changed, but still only 1_day -- update the
+                # baseline so a repeat check later only alerts on a
+                # further change past this point, without notifying now.
+                to_upsert.append({"awb_number": awb, "item_last_updated": current_val})
+
+    if to_upsert:
+        for i in range(0, len(to_upsert), CHUNK_SIZE):
+            store.table("awb_last_seen").upsert(
+                to_upsert[i:i + CHUNK_SIZE], on_conflict="awb_number"
+            ).execute()
+
+    purge_old_rows(store, "awb_update_alerts")
+
+    print(f"Update-detection: checked {len(tracked_records)} tracked shipments, sent {alerts_sent} alerts.")
 
 
-def _read_tab_records(sh, title):
-    try:
-        rows = sh.worksheet(title).get_all_values()
-    except gspread.exceptions.WorksheetNotFound:
-        return []
-    if len(rows) < 2:
-        return []
-    headers = rows[0]
-    return [dict(zip(headers, r + [""] * (len(headers) - len(r)))) for r in rows[1:]]
+# FWD-only: CLIENT Warehouse and BRSNR are two different categories but the
+# same physical step ("PFC"); Received at DC is "RDC" (bin distinguished by
+# bin_level); At Dock is the final step before a shipment clears out of
+# pendency entirely. REV doesn't follow this flow, so stage-tracking is
+# scoped to report_type == "FWD" only.
+FWD_PFC_TYPES = {"CLIENT Warehouse", "BRSNR"}
 
 
-def _replace_small_tab(sh, title, headers, rows):
-    ws = _get_or_create_worksheet(sh, title, rows=max(len(rows) + 1, 100), cols=max(len(headers), 5))
-    matrix = [headers] + [[r.get(h, "") for h in headers] for r in rows]
-    ws.resize(rows=max(len(matrix), 1), cols=max(len(headers), 1))
-    ws.clear()
-    last_col = _sheet_col(len(headers))
-    for start in range(0, len(matrix), 5000):
-        end = min(start + 5000, len(matrix))
-        ws.update(f"A{start+1}:{last_col}{end}", matrix[start:end], raw=True)
-
-
-def _parse_dt(val):
-    if not val:
-        return None
-    try:
-        return dateutil_parser.parse(str(val).strip())
-    except (ValueError, OverflowError):
-        return None
+def _fetch_awb_time_map(store, table, time_column):
+    """Small tables only (currently-at-RDC / currently-at-Dock shipments,
+    not the full historical volume) -- cheap to fetch every run. Returns
+    {awb_number: last_recorded_time} so callers can detect a genuinely
+    NEW scan (item_last_updated moved forward) vs. the same snapshot
+    being re-observed by this run's poll."""
+    times = {}
+    start = 0
+    PAGE = 1000
+    while True:
+        resp = store.table(table).select(f"awb_number, {time_column}").range(start, start + PAGE - 1).execute()
+        for row in resp.data:
+            times[row["awb_number"]] = row.get(time_column)
+        if len(resp.data) < PAGE:
+            break
+        start += PAGE
+    return times
 
 
 def _is_new_scan(new_time, prev_time):
+    """True if this is a genuinely fresh scan -- either the AWB wasn't
+    tracked before at all, or its item_last_updated has moved forward
+    since we last recorded it. This is what lets a re-scan of a
+    shipment that never left RDC still count (the WMS bumps
+    item_last_updated on every real scan action, even when the
+    category/bin doesn't change), while a repeat poll of the exact same
+    unchanged snapshot does NOT get double-counted."""
     if prev_time is None:
         return True
     nt, pt = _parse_dt(new_time), _parse_dt(prev_time)
@@ -587,176 +617,233 @@ def _is_new_scan(new_time, prev_time):
     return nt > pt
 
 
-def check_for_updates_and_alert(sh, records):
-    if not NTFY_TOPIC and not NTFY_TOPIC_REV:
-        print("No NTFY topic configured -- skipping update alerts.")
-        return
+def log_primary_secondary_events(store, records):
+    """Classify FWD shipments by bin_level and record genuine scan events.
 
-    tracked = [r for r in records if is_tracked(r.get("aging_bucket"))]
-    if not tracked:
-        print("No tracked shipments -- nothing to check for updates.")
-        return
+    IMPORTANT D1 FREE-TIER OPTIMIZATION:
+      - rdc_last_seen / at_dock_last_seen are only UPSERTed when the AWB is
+        new or its item_last_updated timestamp actually changed.
+      - The old version UPSERTed every currently tracked AWB on every 15-minute
+        run. Even when the values were identical, those writes could consume
+        the D1 daily row-write quota.
+      - primary_scan_events / secondary_scan_events remain append-only because
+        a genuine timestamp change represents a real scan and must be counted.
+      - AWBs that leave bin 1/bin 2 are still deleted from the corresponding
+        tracking table so they can be detected again if they later return.
 
-    previous_rows = _read_tab_records(sh, "ALERT_STATE")
-    previous = {str(r.get("awb_number", "")).strip().upper(): r.get("item_last_updated") for r in previous_rows if r.get("awb_number")}
+    bin_level == "1" -> Primary
+    bin_level == "2" -> Secondary
+    """
+    existing_primary = _fetch_awb_time_map(store, "rdc_last_seen", "rdc_time")
+    existing_secondary = _fetch_awb_time_map(store, "at_dock_last_seen", "at_dock_time")
 
-    unique = {}
-    for r in tracked:
-        awb = r["awb_number"]
-        if awb not in unique or (_parse_dt(r.get("item_last_updated")) or datetime.min) > (_parse_dt(unique[awb].get("item_last_updated")) or datetime.min):
-            unique[awb] = r
+    current_primary = set()
+    current_secondary = set()
+    primary_rows = []
+    secondary_rows = []
+    primary_track_rows = []
+    secondary_track_rows = []
 
-    state = dict(previous)
-    alerts = []
-    active = {str(r.get("awb_number", "")).strip().upper(): r for r in _read_tab_records(sh, "ACTIVE_FINDINGS") if r.get("awb_number")}
-
-    for r in unique.values():
-        awb = r["awb_number"]
-        current = r.get("item_last_updated")
-        prev = previous.get(awb)
-        if prev is None:
-            state[awb] = current or ""
-            continue
-        if current and prev and _is_new_scan(current, prev):
-            if is_alert_eligible(r.get("aging_bucket")):
-                send_update_alert(r)
-                alerts.append({
-                    "awb_number": awb,
-                    "aging_bucket": r.get("aging_bucket"),
-                    "pendency_type": r.get("pendency_type"),
-                    "report_type": r.get("report_type"),
-                    "last_destination": r.get("last_destination"),
-                    "detected_at": datetime.now(timezone.utc).isoformat(),
-                })
-                active[awb] = {
-                    "awb_number": awb,
-                    "report_type": r.get("report_type"),
-                    "pendency_type": r.get("pendency_type"),
-                    "blocks": r.get("blocks"),
-                    "aging_bucket": r.get("aging_bucket"),
-                    "seal_number": r.get("seal_number"),
-                    "last_destination": r.get("last_destination"),
-                }
-            state[awb] = current
-
-    _replace_small_tab(sh, "ALERT_STATE", ["awb_number", "item_last_updated"], [
-        {"awb_number": k, "item_last_updated": v} for k, v in state.items()
-    ])
-
-    if alerts:
-        old = _read_tab_records(sh, "AWB_UPDATE_ALERTS")
-        old.extend(alerts)
-        cutoff = datetime.now(timezone.utc) - timedelta(days=15)
-        kept = []
-        for r in old:
-            dt = _parse_dt(r.get("detected_at"))
-            if dt is None or dt >= cutoff:
-                kept.append(r)
-        headers = ["awb_number", "aging_bucket", "pendency_type", "report_type", "last_destination", "detected_at"]
-        _replace_small_tab(sh, "AWB_UPDATE_ALERTS", headers, kept)
-
-    active_rows = list(active.values())
-    _replace_small_tab(sh, "ACTIVE_FINDINGS", ["awb_number", "report_type", "pendency_type", "blocks", "aging_bucket", "seal_number", "last_destination"], active_rows)
-    print(f"Update-detection: checked {len(unique)} tracked shipments, sent {len(alerts)} alerts.")
-
-
-def _fetch_awb_time_map(sh, title, time_column):
-    rows = _read_tab_records(sh, title)
-    return {str(r.get("awb_number", "")).strip().upper(): r.get(time_column) for r in rows if r.get("awb_number")}
-
-
-def log_primary_secondary_events(sh, records):
-    existing_primary = _fetch_awb_time_map(sh, "RDC_LAST_SEEN", "rdc_time")
-    existing_secondary = _fetch_awb_time_map(sh, "AT_DOCK_LAST_SEEN", "at_dock_time")
-    current_primary, current_secondary = set(), set()
-    primary_rows, secondary_rows = [], []
-    primary_track, secondary_track = [], []
+    # Keep only one current record per AWB. If the source contains duplicate
+    # rows, use the record with the newest item_last_updated timestamp.
+    current_primary_records = {}
+    current_secondary_records = {}
 
     for r in records:
         if r.get("report_type") != "FWD":
             continue
-        level = str(r.get("bin_level") or "").strip()
-        awb = r["awb_number"]
-        t = r.get("item_last_updated")
-        if level == "2":
-            current_secondary.add(awb)
-            secondary_track.append({"awb_number": awb, "at_dock_time": t})
-            if _is_new_scan(t, existing_secondary.get(awb)):
-                secondary_rows.append({
-                    "awb_number": awb, "action_user": r.get("action_user"), "emp_name": r.get("emp_name"),
-                    "client_name": r.get("client_name"), "layout_name": r.get("layout_name"),
-                    "blocks": r.get("blocks"), "occurred_at": t,
-                })
-        elif level == "1":
-            current_primary.add(awb)
-            primary_track.append({"awb_number": awb, "rdc_time": t, "bin_level": level})
-            if _is_new_scan(t, existing_primary.get(awb)):
-                primary_rows.append({
-                    "awb_number": awb, "action_user": r.get("action_user"), "emp_name": r.get("emp_name"),
-                    "client_name": r.get("client_name"), "layout_name": r.get("layout_name"),
-                    "blocks": r.get("blocks"), "occurred_at": t,
-                })
 
-    pfc_rows = [{"awb_number": r["awb_number"], "first_seen_at": r.get("item_last_updated"), "pendency_type": r.get("pendency_type")}
-                for r in records if r.get("report_type") == "FWD" and (r.get("pendency_type") or "").strip() in FWD_PFC_TYPES]
+        awb = str(r.get("awb_number") or "").strip()
+        if not awb:
+            continue
 
+        bin_level = str(r.get("bin_level") or "").strip()
+
+        if bin_level == "2":
+            old = current_secondary_records.get(awb)
+            if old is None or str(r.get("item_last_updated") or "") > str(old.get("item_last_updated") or ""):
+                current_secondary_records[awb] = r
+        elif bin_level == "1":
+            old = current_primary_records.get(awb)
+            if old is None or str(r.get("item_last_updated") or "") > str(old.get("item_last_updated") or ""):
+                current_primary_records[awb] = r
+
+    # PRIMARY / BIN 1
+    for awb, r in current_primary_records.items():
+        current_primary.add(awb)
+        new_time = r.get("item_last_updated")
+        previous_time = existing_primary.get(awb)
+
+        # Event log: only a genuinely new/fresh scan creates a historical row.
+        if _is_new_scan(new_time, previous_time):
+            primary_rows.append({
+                "awb_number": awb,
+                "action_user": r.get("action_user"),
+                "emp_name": r.get("emp_name"),
+                "client_name": r.get("client_name"),
+                "layout_name": r.get("layout_name"),
+                "blocks": r.get("blocks"),
+                "occurred_at": new_time,
+            })
+
+        # CRITICAL FIX: do NOT upsert an unchanged row every pipeline run.
+        # Only write when the tracking value is actually new/changed.
+        if previous_time is None or (
+            new_time is not None
+            and _parse_dt(new_time) is not None
+            and _parse_dt(previous_time) is not None
+            and _parse_dt(new_time) > _parse_dt(previous_time)
+        ):
+            primary_track_rows.append({
+                "awb_number": awb,
+                "rdc_time": new_time,
+                "bin_level": "1",
+            })
+
+    # SECONDARY / BIN 2
+    for awb, r in current_secondary_records.items():
+        current_secondary.add(awb)
+        new_time = r.get("item_last_updated")
+        previous_time = existing_secondary.get(awb)
+
+        if _is_new_scan(new_time, previous_time):
+            secondary_rows.append({
+                "awb_number": awb,
+                "action_user": r.get("action_user"),
+                "emp_name": r.get("emp_name"),
+                "client_name": r.get("client_name"),
+                "layout_name": r.get("layout_name"),
+                "blocks": r.get("blocks"),
+                "occurred_at": new_time,
+            })
+
+        # Same D1-write optimization for the Secondary tracking table.
+        if previous_time is None or (
+            new_time is not None
+            and _parse_dt(new_time) is not None
+            and _parse_dt(previous_time) is not None
+            and _parse_dt(new_time) > _parse_dt(previous_time)
+        ):
+            secondary_track_rows.append({
+                "awb_number": awb,
+                "at_dock_time": new_time,
+            })
+
+    pfc_rows = [
+        {
+            "awb_number": r["awb_number"],
+            "first_seen_at": r.get("item_last_updated"),
+            "pendency_type": r.get("pendency_type"),
+        }
+        for r in records
+        if r.get("report_type") == "FWD"
+        and (r.get("pendency_type") or "").strip() in FWD_PFC_TYPES
+    ]
+
+    rdc_to_clear = list(existing_primary.keys() - current_primary)
+    at_dock_to_clear = list(existing_secondary.keys() - current_secondary)
+
+    # Historical event rows are intentionally plain INSERTs: every genuine
+    # new scan must remain available for counting/audit purposes.
     if primary_rows:
-        old = _read_tab_records(sh, "PRIMARY_SCAN_EVENTS")
-        old.extend(primary_rows)
-        _replace_small_tab(sh, "PRIMARY_SCAN_EVENTS", ["awb_number","action_user","emp_name","client_name","layout_name","blocks","occurred_at"], old)
+        for i in range(0, len(primary_rows), CHUNK_SIZE):
+            store.table("primary_scan_events").insert(
+                primary_rows[i:i + CHUNK_SIZE]
+            ).execute()
+
     if secondary_rows:
-        old = _read_tab_records(sh, "SECONDARY_SCAN_EVENTS")
-        old.extend(secondary_rows)
-        _replace_small_tab(sh, "SECONDARY_SCAN_EVENTS", ["awb_number","action_user","emp_name","client_name","layout_name","blocks","occurred_at"], old)
+        for i in range(0, len(secondary_rows), CHUNK_SIZE):
+            store.table("secondary_scan_events").insert(
+                secondary_rows[i:i + CHUNK_SIZE]
+            ).execute()
+
+    # First-seen PFC is intentionally ignore-duplicate. Existing AWBs do not
+    # need to be rewritten.
     if pfc_rows:
-        old = {r.get("awb_number"): r for r in _read_tab_records(sh, "PFC_FIRST_SEEN") if r.get("awb_number")}
-        for r in pfc_rows:
-            old.setdefault(r["awb_number"], r)
-        _replace_small_tab(sh, "PFC_FIRST_SEEN", ["awb_number","first_seen_at","pendency_type"], list(old.values()))
+        for i in range(0, len(pfc_rows), CHUNK_SIZE):
+            store.table("pfc_first_seen").upsert(
+                pfc_rows[i:i + CHUNK_SIZE],
+                on_conflict="awb_number",
+                ignore_duplicates=True,
+            ).execute()
 
-    # Current-state tracking sheets are replaced in one batch each.
-    _replace_small_tab(sh, "RDC_LAST_SEEN", ["awb_number","rdc_time","bin_level"], [
-        {"awb_number": a, "rdc_time": r.get("rdc_time"), "bin_level": r.get("bin_level")} for a, r in {x["awb_number"]: x for x in primary_track}.items()
-    ])
-    _replace_small_tab(sh, "AT_DOCK_LAST_SEEN", ["awb_number","at_dock_time"], [
-        {"awb_number": a, "at_dock_time": r.get("at_dock_time")} for a, r in {x["awb_number"]: x for x in secondary_track}.items()
-    ])
+    # FIX: these writes are now incremental instead of rewriting every
+    # currently active shipment on every 15-minute pipeline run.
+    if primary_track_rows:
+        for i in range(0, len(primary_track_rows), CHUNK_SIZE):
+            store.table("rdc_last_seen").upsert(
+                primary_track_rows[i:i + CHUNK_SIZE],
+                on_conflict="awb_number",
+            ).execute()
 
-    # Retain 15 days of event history.
-    cutoff = datetime.now(timezone.utc) - timedelta(days=15)
-    for title in ("PRIMARY_SCAN_EVENTS", "SECONDARY_SCAN_EVENTS"):
-        rows = _read_tab_records(sh, title)
-        kept = []
-        for r in rows:
-            dt = _parse_dt(r.get("occurred_at"))
-            if dt is None or dt >= cutoff:
-                kept.append(r)
-        _replace_small_tab(sh, title, ["awb_number","action_user","emp_name","client_name","layout_name","blocks","occurred_at"], kept)
+    if secondary_track_rows:
+        for i in range(0, len(secondary_track_rows), CHUNK_SIZE):
+            store.table("at_dock_last_seen").upsert(
+                secondary_track_rows[i:i + CHUNK_SIZE],
+                on_conflict="awb_number",
+            ).execute()
 
-    print(f"Scan events: {len(primary_rows)} new primary, {len(secondary_rows)} new secondary, {len(pfc_rows)} PFC observations.")
+    # Remove shipments that are no longer in the corresponding bin. These
+    # deletes are necessary because the tables represent CURRENT state, not
+    # historical state. They are normally small and happen only when an AWB
+    # leaves the stage.
+    if rdc_to_clear:
+        for i in range(0, len(rdc_to_clear), 200):
+            store.table("rdc_last_seen").delete().in_(
+                "awb_number", rdc_to_clear[i:i + 200]
+            ).execute()
+
+    if at_dock_to_clear:
+        for i in range(0, len(at_dock_to_clear), 200):
+            store.table("at_dock_last_seen").delete().in_(
+                "awb_number", at_dock_to_clear[i:i + 200]
+            ).execute()
+
+    purge_old_rows(store, "primary_scan_events", column="occurred_at")
+    purge_old_rows(store, "secondary_scan_events", column="occurred_at")
+
+    print(
+        f"Scan events: {len(primary_rows)} new primary, "
+        f"{len(secondary_rows)} new secondary, "
+        f"{len(pfc_rows)} PFC rows, "
+        f"{len(primary_track_rows)} Primary tracking WRITES, "
+        f"{len(secondary_track_rows)} Secondary tracking WRITES, "
+        f"{len(rdc_to_clear)} left RDC, "
+        f"{len(at_dock_to_clear)} left At Dock."
+    )
+
 
 def main():
     captured_at = datetime.now(timezone.utc).isoformat()
+    store = CFStore()
 
-    print("Loading PENDENCY MASTER data from Google Sheets...")
-    sh = _get_spreadsheet()
+    print("Loading reference sheets from Google Sheets...")
     ref = load_reference_sheets()
     lookups = build_lookup_maps(ref)
 
-    fwd_rows = ref.get("FWD_RAW", [])
-    rev_rows = ref.get("REV_RAW", [])
-    if len(fwd_rows) < 2 or len(rev_rows) < 2:
-        print("FWD_RAW or REV_RAW has no data rows -- stopping without changing AUDIT_MASTER.")
+    fwd_present = os.path.exists(FWD_CSV_PATH)
+    rev_present = os.path.exists(REV_CSV_PATH)
+
+    if not fwd_present or not rev_present:
+        # audit_master is one shared table -- rebuilding it from only one
+        # side would wipe out the other side's rows entirely (the truncate
+        # clears everything). Safer to skip the rebuild this run and keep
+        # the last complete version than to replace it with an incomplete
+        # one. fwd/rev_pendency_current are unaffected by this -- those
+        # already updated correctly in upload_to_store.py.
+        missing = "FWD" if not fwd_present else "REV"
+        print(f"{missing} file missing this run -- skipping audit_master rebuild "
+              f"to avoid wiping the other side. Keeping the last complete version.")
         return
 
     records = []
-    print(f"Reading FWD_RAW from Google Sheets: {len(fwd_rows) - 1} rows...")
-    fwd_df = pd.DataFrame(fwd_rows[1:], columns=fwd_rows[0], dtype=str)
+    print(f"Reading {FWD_CSV_PATH}...")
+    fwd_df = pd.read_csv(FWD_CSV_PATH, dtype=str, na_values=["\\N"], keep_default_na=True)
     print("Enriching FWD rows...")
     records += enrich_dataframe(fwd_df, lookups, "FWD")
 
-    print(f"Reading REV_RAW from Google Sheets: {len(rev_rows) - 1} rows...")
-    rev_df = pd.DataFrame(rev_rows[1:], columns=rev_rows[0], dtype=str)
+    print(f"Reading {REV_CSV_PATH}...")
+    rev_df = pd.read_csv(REV_CSV_PATH, dtype=str, na_values=["\\N"], keep_default_na=True)
     print("Enriching REV rows...")
     records += enrich_dataframe(rev_df, lookups, "REV")
 
@@ -765,19 +852,22 @@ def main():
     records = [{k: (None if pd.isna(v) else v) for k, v in r.items()} for r in records]
 
     total = len(records)
-    print(f"Writing {total} audit_master rows to Google Sheet...")
-    write_records_to_sheet(sh, "AUDIT_MASTER", records, chunk_size=5000)
+    print(f"Writing {total} audit_master rows to compressed KV snapshot...")
+    put_json("audit_master.json.gz", records)
 
-    print("Checking for shipment updates...")
-    check_for_updates_and_alert(sh, records)
+    print("\nChecking for shipment updates...")
+    check_for_updates_and_alert(store, records)
 
-    print("Logging Primary/Secondary scan events...")
-    log_primary_secondary_events(sh, records)
+    print("\nLogging Primary/Secondary scan events...")
+    log_primary_secondary_events(store, records)
 
-    print("Syncing Load Pending summary (read-only)...")
-    sync_load_pending_summary(None)
+    print("\nSyncing Load Pending summary (SDD/AIR/NDD LOAD tabs)...")
+    try:
+        sync_load_pending_summary(store)
+    except Exception as e:
+        print(f"  Load Pending sync failed (non-critical, leaving previous data): {e}")
 
-    print("DONE - no Cloudflare used by build_audit_master.py.")
+    print("Done.")
 
 
 if __name__ == "__main__":
