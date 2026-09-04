@@ -34,7 +34,7 @@ AUDIT_SHEET_ID = os.environ.get("AUDIT_SHEET_ID")
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC")
 NTFY_TOPIC_REV = os.environ.get("NTFY_TOPIC_REV")
 
-WRITE_CHUNK = 500
+WRITE_CHUNK = 2500
 STATE_READ_CHUNK = 500
 
 RDCPFC_CATEGORIES = {"NOT IN BAG / Received at DC", "CLIENT Warehouse"}
