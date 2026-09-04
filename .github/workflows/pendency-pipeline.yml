@@ -34,11 +34,11 @@ jobs:
           service_account: pendency-github@flawless-energy-507612-e0.iam.gserviceaccount.com
 
       - name: Download pendency reports
-  env:
-    SHADOWFAX_USERNAME: ${{ secrets.SHADOWFAX_USERNAME }}
-    SHADOWFAX_PASSWORD: ${{ secrets.SHADOWFAX_PASSWORD }}
-    AUDIT_SHEET_ID: ${{ secrets.AUDIT_SHEET_ID }}
-  run: python download_pendency.py
+        env:
+          SHADOWFAX_USERNAME: ${{ secrets.SHADOWFAX_USERNAME }}
+          SHADOWFAX_PASSWORD: ${{ secrets.SHADOWFAX_PASSWORD }}
+          AUDIT_SHEET_ID: ${{ secrets.AUDIT_SHEET_ID }}
+        run: python download_pendency.py
 
       - name: Upload debug screenshots
         if: always()
