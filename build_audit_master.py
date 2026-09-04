@@ -15,7 +15,6 @@ Known, deliberately-preserved quirks carried over from the original sheet
     formula's condition can never be true, so it never takes the other branch.
 """
 
-import json
 import os
 import sys
 from datetime import datetime, timedelta, timezone
@@ -24,12 +23,11 @@ import gspread
 import pandas as pd
 import requests
 from dateutil import parser as dateutil_parser
-from google.oauth2.service_account import Credentials
+from google.auth import default as google_auth_default
 from cf_store import CFStore, put_json
 
 CF_API_URL = os.environ.get("CF_API_URL")
 CF_API_TOKEN = os.environ.get("CF_API_TOKEN")
-GOOGLE_SERVICE_ACCOUNT_JSON = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
 AUDIT_SHEET_ID = os.environ.get("AUDIT_SHEET_ID")
 FWD_CSV_PATH = os.environ.get("FWD_CSV_PATH", "fwd_pendency.csv")
 REV_CSV_PATH = os.environ.get("REV_CSV_PATH", "rev_pendency.csv")
@@ -37,10 +35,9 @@ CHUNK_SIZE = 500  # was 500 -- fewer, larger requests to cut total run time
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC")           # FWD alerts
 NTFY_TOPIC_REV = os.environ.get("NTFY_TOPIC_REV")    # REV alerts -- separate channel
 
-if not all([CF_API_URL, CF_API_TOKEN, GOOGLE_SERVICE_ACCOUNT_JSON, AUDIT_SHEET_ID]):
+if not all([CF_API_URL, CF_API_TOKEN, AUDIT_SHEET_ID]):
     sys.exit(
-        "Missing one of: CF_API_URL, CF_API_TOKEN, "
-        "GOOGLE_SERVICE_ACCOUNT_JSON, AUDIT_SHEET_ID"
+        "Missing one of: CF_API_URL, CF_API_TOKEN, AUDIT_SHEET_ID"
     )
 
 # Category -> which enrichment rules apply, confirmed against the real sheet.
@@ -48,31 +45,62 @@ RDCPFC_CATEGORIES = {"NOT IN BAG / Received at DC", "CLIENT Warehouse"}
 AT_DOCKBRSNR_CATEGORIES = {"IN BAG / At Dock", "IN BAG / BRSNR"}
 
 
+# All Google-Sheet data needed by the audit build is fetched in one
+# values.batchGet request per pipeline run. The download step has already
+# replaced FWD_RAW/REV_RAW in this same workbook.
+SHEET_VALUES_CACHE = {}
+
+
 def load_reference_sheets():
-    creds_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
-    creds = Credentials.from_service_account_info(
-        creds_info,
-        scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"],
+    creds, _ = google_auth_default(
+        scopes=["https://www.googleapis.com/auth/spreadsheets"]
     )
     gc = gspread.authorize(creds)
     sh = gc.open_by_key(AUDIT_SHEET_ID)
 
-    def rows(tab_name, required=True):
-        try:
-            return sh.worksheet(tab_name).get_all_values()
-        except gspread.exceptions.WorksheetNotFound:
-            if required:
-                raise
-            print(f"WARNING: worksheet '{tab_name}' not found -- skipping (non-critical).")
-            return []
+    tab_names = [
+        "FWD_RAW",
+        "REV_RAW",
+        "EXCEPTION",
+        "Layout Name Block Wise",
+        "MAPPING",
+        "EMP_DATA",
+        "Stagging",
+        "SDD LOAD",
+        "AIR LOAD",
+        "NDD LOAD",
+    ]
+    ranges = [f"'{name}'!A:ZZ" for name in tab_names]
+
+    try:
+        response = sh.values_batch_get(ranges)
+    except Exception as e:
+        raise RuntimeError(f"Could not read PENDENCY MASTER tabs: {e}") from e
+
+    value_ranges = response.get("valueRanges", [])
+    values_by_tab = {}
+    for name, vr in zip(tab_names, value_ranges):
+        values_by_tab[name] = vr.get("values", [])
+
+    SHEET_VALUES_CACHE.clear()
+    SHEET_VALUES_CACHE.update(values_by_tab)
+
+    def required_rows(tab_name):
+        rows = values_by_tab.get(tab_name, [])
+        if not rows:
+            raise RuntimeError(f"Required worksheet '{tab_name}' is empty or missing.")
+        return rows
 
     return {
-        "EXCEPTION": rows("EXCEPTION"),
-        "Layout Name Block Wise": rows("Layout Name Block Wise"),
-        "MAPPING": rows("MAPPING"),
-        "EMP_DATA": rows("EMP_DATA"),
-        "Stagging": rows("Stagging"),
+        "EXCEPTION": required_rows("EXCEPTION"),
+        "Layout Name Block Wise": required_rows("Layout Name Block Wise"),
+        "MAPPING": required_rows("MAPPING"),
+        "EMP_DATA": required_rows("EMP_DATA"),
+        "Stagging": required_rows("Stagging"),
+        "FWD_RAW": required_rows("FWD_RAW"),
+        "REV_RAW": required_rows("REV_RAW"),
     }
+
 
 LOAD_PENDING_SHEETS = ["SDD LOAD", "AIR LOAD", "NDD LOAD"]
 
@@ -88,13 +116,6 @@ def sync_load_pending_summary(store):
       -- nothing about the exact column layout is hardcoded, only the
       row numbers (2/3/5) are fixed, since that's the one thing confirmed
       identical across all three tabs."""
-    creds_info = json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
-    creds = Credentials.from_service_account_info(
-        creds_info, scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"]
-    )
-    gc = gspread.authorize(creds)
-    sh = gc.open_by_key(AUDIT_SHEET_ID)
-
     def to_num(v):
         try:
             return int(str(v).replace(",", "").strip())
@@ -103,10 +124,9 @@ def sync_load_pending_summary(store):
 
     records = []
     for tab_name in LOAD_PENDING_SHEETS:
-        try:
-            rows = sh.worksheet(tab_name).get_all_values()
-        except gspread.exceptions.WorksheetNotFound:
-            print(f"WARNING: Load Pending worksheet '{tab_name}' not found -- skipping.")
+        rows = SHEET_VALUES_CACHE.get(tab_name, [])
+        if not rows:
+            print(f"WARNING: Load Pending worksheet '{tab_name}' missing/empty -- skipping.")
             continue
         if len(rows) < 5:
             print(f"WARNING: '{tab_name}' has fewer than 5 rows -- skipping.")
@@ -736,29 +756,21 @@ def main():
     ref = load_reference_sheets()
     lookups = build_lookup_maps(ref)
 
-    fwd_present = os.path.exists(FWD_CSV_PATH)
-    rev_present = os.path.exists(REV_CSV_PATH)
+    fwd_rows = ref.get("FWD_RAW", [])
+    rev_rows = ref.get("REV_RAW", [])
 
-    if not fwd_present or not rev_present:
-        # audit_master is one shared table -- rebuilding it from only one
-        # side would wipe out the other side's rows entirely (the truncate
-        # clears everything). Safer to skip the rebuild this run and keep
-        # the last complete version than to replace it with an incomplete
-        # one. fwd/rev_pendency_current are unaffected by this -- those
-        # already updated correctly in upload_to_store.py.
-        missing = "FWD" if not fwd_present else "REV"
-        print(f"{missing} file missing this run -- skipping audit_master rebuild "
-              f"to avoid wiping the other side. Keeping the last complete version.")
+    if len(fwd_rows) < 2 or len(rev_rows) < 2:
+        print("FWD_RAW or REV_RAW has no data rows -- skipping audit_master rebuild.")
         return
 
     records = []
-    print(f"Reading {FWD_CSV_PATH}...")
-    fwd_df = pd.read_csv(FWD_CSV_PATH, dtype=str, na_values=["\\N"], keep_default_na=True)
+    print(f"Reading FWD_RAW from Google Sheets: {len(fwd_rows) - 1} rows...")
+    fwd_df = pd.DataFrame(fwd_rows[1:], columns=fwd_rows[0], dtype=str)
     print("Enriching FWD rows...")
     records += enrich_dataframe(fwd_df, lookups, "FWD")
 
-    print(f"Reading {REV_CSV_PATH}...")
-    rev_df = pd.read_csv(REV_CSV_PATH, dtype=str, na_values=["\\N"], keep_default_na=True)
+    print(f"Reading REV_RAW from Google Sheets: {len(rev_rows) - 1} rows...")
+    rev_df = pd.DataFrame(rev_rows[1:], columns=rev_rows[0], dtype=str)
     print("Enriching REV rows...")
     records += enrich_dataframe(rev_df, lookups, "REV")
 
