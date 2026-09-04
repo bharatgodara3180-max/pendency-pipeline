@@ -8,6 +8,9 @@ real-time scan alerts.
 Runs at 8:05 AM IST (covers the previous 8:00 PM - 8:00 AM night shift)
 and 8:05 PM IST (covers the 8:00 AM - 8:00 PM day shift) -- in both
 cases, simply "the last 12 hours" relative to when this actually runs.
+
+Reads AUDIT_SCANS, AWB_UPDATE_ALERTS and AUDIT_MASTER straight out of the
+PENDENCY MASTER Google Sheet -- no Cloudflare.
 """
 
 import os
@@ -15,14 +18,13 @@ import sys
 from datetime import datetime, timedelta, timezone
 
 import requests
-from cf_store import CFStore
 
-CF_API_URL = os.environ.get("CF_API_URL")
-CF_API_TOKEN = os.environ.get("CF_API_TOKEN")
+from sheets_common import get_sheet, read_records
+
 NTFY_SHIFT_TOPIC = os.environ.get("NTFY_SHIFT_TOPIC")
 
-if not all([CF_API_URL, CF_API_TOKEN, NTFY_SHIFT_TOPIC]):
-    sys.exit("Missing CF_API_URL, CF_API_TOKEN, or NTFY_SHIFT_TOPIC")
+if not NTFY_SHIFT_TOPIC:
+    sys.exit("Missing NTFY_SHIFT_TOPIC")
 
 AGING_ORDER = ["2_day", "3_day", "4_day", "5_day", "6_day", "6+_day"]
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -45,21 +47,26 @@ def is_ageing_positive(val):
         return False
 
 
-def fetch_all(supabase, table, select, apply_filters=None, chunk=1000):
-    """Paginate through a Supabase select -- a single request caps at 1000 rows."""
-    rows = []
-    start = 0
-    while True:
-        q = supabase.table(table).select(select)
-        if apply_filters:
-            q = apply_filters(q)
-        q = q.range(start, start + chunk - 1)
-        resp = q.execute()
-        rows += resp.data
-        if len(resp.data) < chunk:
-            break
-        start += chunk
-    return rows
+def parse_ts(val):
+    if not val:
+        return None
+    try:
+        return datetime.fromisoformat(str(val).replace("Z", "+00:00"))
+    except ValueError:
+        pass
+    try:
+        return datetime.strptime(str(val).strip(), "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return None
+
+
+def in_window(ts_raw, window_start, window_end):
+    ts = parse_ts(ts_raw)
+    if ts is None:
+        return False
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    return window_start <= ts <= window_end
 
 
 def fmt_ist(dt):
@@ -120,26 +127,19 @@ def main():
     ist_hour = now.astimezone(IST).hour
     shift_label = "Night Shift (8PM-8AM)" if ist_hour < 14 else "Day Shift (8AM-8PM)"
 
-    supabase = CFStore()
+    sh = get_sheet()
 
     print(f"Fetching scans between {window_start.isoformat()} and {now.isoformat()}...")
-    scans = fetch_all(
-        supabase, "audit_scans",
-        "awb_number, ageing, pendency, report_type, scanned_at",
-        apply_filters=lambda q: q.gte("scanned_at", window_start.isoformat()).lte("scanned_at", now.isoformat()),
-    )
+    all_scans = read_records(sh, "AUDIT_SCANS")
     ageing_scans = [
-        s for s in scans
-        if is_ageing_positive(s.get("ageing")) and s.get("report_type")
+        s for s in all_scans
+        if is_ageing_positive(s.get("ageing")) and s.get("report_type") and in_window(s.get("scanned_at"), window_start, now)
     ]
-    print(f"  {len(scans)} total scans, {len(ageing_scans)} were +1 ageing (2_day+) with a known FWD/REV type")
+    print(f"  {len(all_scans)} total scans in the sheet, {len(ageing_scans)} were +1 ageing (2_day+) with a known FWD/REV type in this window")
 
     print("Fetching automated update-detection alerts for this window...")
-    auto_alerts = fetch_all(
-        supabase, "awb_update_alerts",
-        "awb_number, aging_bucket, pendency_type, report_type, detected_at",
-        apply_filters=lambda q: q.gte("detected_at", window_start.isoformat()).lte("detected_at", now.isoformat()),
-    )
+    all_alerts = read_records(sh, "AWB_UPDATE_ALERTS")
+    auto_alerts = [a for a in all_alerts if in_window(a.get("detected_at"), window_start, now)]
     print(f"  {len(auto_alerts)} automated update alerts this window")
 
     # Merge both sources into ONE combined set, keyed by AWB, so a shipment
@@ -147,13 +147,19 @@ def main():
     # once, not twice. Scan data wins if both exist for the same AWB.
     combined = {}
     for a in auto_alerts:
-        combined[a["awb_number"]] = {
+        awb = str(a.get("awb_number") or "").strip().upper()
+        if not awb:
+            continue
+        combined[awb] = {
             "report_type": a.get("report_type") or "UNKNOWN",
             "category": a.get("pendency_type") or "UNKNOWN",
             "aging": a.get("aging_bucket"),
         }
     for s in ageing_scans:
-        combined[s["awb_number"]] = {
+        awb = str(s.get("awb_number") or "").strip().upper()
+        if not awb:
+            continue
+        combined[awb] = {
             "report_type": s.get("report_type") or "UNKNOWN",
             "category": s.get("pendency") or "UNKNOWN",
             "aging": s.get("ageing"),
@@ -164,21 +170,13 @@ def main():
         print("Nothing scanned or auto-detected this shift -- sent empty report.")
         return
 
-    print(f"Checking current status of {len(combined)} shipments against latest audit_master...")
+    print(f"Checking current status of {len(combined)} shipments against latest AUDIT_MASTER...")
+    audit_master = read_records(sh, "AUDIT_MASTER")
     still_ageing = set()
-    awbs = list(combined.keys())
-    CHUNK = 200
-    for i in range(0, len(awbs), CHUNK):
-        chunk = awbs[i:i + CHUNK]
-        resp = (
-            supabase.table("audit_master")
-            .select("awb_number, aging_bucket")
-            .in_("awb_number", chunk)
-            .execute()
-        )
-        for row in resp.data:
-            if is_ageing_positive(row.get("aging_bucket")):
-                still_ageing.add(row["awb_number"])
+    for row in audit_master:
+        awb = str(row.get("awb_number") or "").strip().upper()
+        if awb in combined and is_ageing_positive(row.get("aging_bucket")):
+            still_ageing.add(awb)
 
     # matrix[report_type][category][aging_bucket] = {"scanned": n, "closed": n}
     # "scanned" here means "known" -- via a human scan OR auto-detection.
