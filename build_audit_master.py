@@ -293,7 +293,14 @@ def normalize_timestamp(raw):
 def enrich_dataframe(df, lookups, report_type):
     records = []
     for _, row in df.iterrows():
-        awb = str(row.get("awb_number") or "").strip().upper()
+        if report_type == "REV":
+            # REV_RAW never had an "awb_number" column at all -- its
+            # identifier is connected_awb (falling back to dsp_awb_number),
+            # per the portal's REV export. Using "awb_number" here silently
+            # left every REV row blank in AUDIT_MASTER column A.
+            awb = str(row.get("connected_awb") or row.get("dsp_awb_number") or "").strip().upper()
+        else:
+            awb = str(row.get("awb_number") or "").strip().upper()
         category = row.get("category") or ""
         layout_name = row.get("layout_name") or ""
 
@@ -854,6 +861,45 @@ def sync_load_pending_summary(sh, ref):
         print(f"Load Pending: wrote {len(records)} summary rows to Google Sheets.")
 
 
+def sync_pendency_snapshot_summary(sh, records, captured_at, retain_days=31):
+    """One row per (report_type, category, aging_bucket) per run, appended
+    to a rolling history -- this is what the dashboard's "Base Pendency
+    Overview" panel reads.
+
+    Previously only upload_snapshots.py produced this data, and that
+    script was never wired into the automated pipeline (it was a manual
+    "run this by hand" step) -- so this tab, and that dashboard panel,
+    were already silently empty/stale before the Cloudflare migration.
+    Computed here directly from the same in-memory `records` AUDIT_MASTER
+    is built from, instead of a separate script reading a separate CSV.
+    """
+    counts = {}
+    for r in records:
+        key = (r.get("report_type") or "UNKNOWN", r.get("pendency_type") or "UNKNOWN", r.get("aging_bucket") or "UNKNOWN")
+        counts[key] = counts.get(key, 0) + 1
+
+    new_rows = [
+        {"report_type": rt, "category": cat, "aging_bucket": ab, "shipment_count": n, "captured_at": captured_at}
+        for (rt, cat, ab), n in counts.items()
+    ]
+
+    existing = read_all_values(sh, "PENDENCY_SNAPSHOT_SUMMARY")
+    history = []
+    if len(existing) >= 2:
+        headers = existing[0]
+        for row in existing[1:]:
+            padded = row + [""] * (len(headers) - len(row))
+            history.append(dict(zip(headers, padded)))
+
+    history.extend(new_rows)
+
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=retain_days)
+    trimmed = [row for row in history if (_parse_dt(row.get("captured_at")) or cutoff) >= cutoff]
+
+    write_full_table(sh, "PENDENCY_SNAPSHOT_SUMMARY", trimmed, min_cols=5)
+    print(f"  wrote {len(new_rows)} new summary rows; retained {len(trimmed)} total (last {retain_days} days)")
+
+
 def main():
     started = datetime.now(timezone.utc).isoformat()
     print(f"Run started: {started}")
@@ -883,7 +929,12 @@ def main():
     print("Enriching REV rows...")
     records.extend(enrich_dataframe(rev_df, lookups, "REV"))
 
-    captured_at = datetime.now(timezone.utc).isoformat()
+    # Plain isoformat() gives microseconds + "+00:00" (e.g.
+    # "2026-09-04T18:13:21.378552+00:00") -- Sheets stores it as text either
+    # way, so drop the noise: seconds precision + "Z" is still a real ISO
+    # 8601 UTC timestamp (parses fine in JS/Python) and, as fixed-width
+    # text, still sorts correctly chronologically.
+    captured_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     for r in records:
         r["captured_at"] = captured_at
 
@@ -898,6 +949,9 @@ def main():
 
     print("Syncing Load Pending summary...")
     sync_load_pending_summary(sh, ref)
+
+    print("Syncing Pendency snapshot summary...")
+    sync_pendency_snapshot_summary(sh, records, captured_at)
 
     print("DONE — no Cloudflare write performed by build_audit_master.py")
 
