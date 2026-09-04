@@ -1,7 +1,7 @@
 """
 Runs at 9:00 and 21:00 IST (see .github/workflows/findings-cleanup.yml,
 triggered externally like the other pipelines). For every open finding in
-active_findings, checks its CURRENT stage in audit_master and decides:
+ACTIVE_FINDINGS, checks its CURRENT stage in AUDIT_MASTER and decides:
 
   - alerted at PFC/RDC/BRSNR, now At Dock              -> CLOSED
   - alerted at PFC/RDC/BRSNR, still not At Dock          -> OPEN (unchanged)
@@ -14,93 +14,115 @@ active_findings, checks its CURRENT stage in audit_master and decides:
   - alerted At Dock, gone from data entirely (cleared)   -> CLOSED
   - alerted At Dock, still shows At Dock                 -> OPEN
 
-Closed findings are deleted from active_findings so the next shift only
+Closed findings are removed from ACTIVE_FINDINGS so the next shift only
 ever sees what's still open. The Findings Status page in the app computes
 the SAME open/closed logic live on every view (so status is visible in
 real time, not just at the two cleanup times) -- this script's only job is
 the twice-daily prune.
 
-Also purges audit_scans rows older than 3 days -- the Audit Reports
-dashboard itself only ever queries "since the last 9 AM" (computed
-client-side), so this is just housekeeping to stop the table growing
-forever, not what makes the dashboard show only today's data.
+Also purges AUDIT_SCANS rows older than 3 days -- the Audit Reports
+dashboard itself only ever queries "since the last shift-day start"
+(computed client-side), so this is just housekeeping to stop the tab
+growing forever, not what makes the dashboard show only today's data.
+
+Everything below lives in the same PENDENCY MASTER Google Sheet as the
+rest of the pipeline -- no Cloudflare, no external database.
+
+NOTE: this script assumes an ACTIVE_FINDINGS tab (awb_number, report_type,
+pendency_type, blocks, seal_number) and an AUDIT_SCANS tab (matching what
+the scanning site logs). Neither tab existed anywhere in this repo before
+this rewrite -- the old Cloudflare version's `active_findings` table was
+never populated by any script here either, so whatever decides "this is a
+finding" needs to be built as part of the scanning-site rebuild (Phase 2)
+and told to write into these same tab names/columns.
 """
 
-import os
-import sys
 from datetime import datetime, timedelta, timezone
 
-from cf_store import CFStore
-
-CF_API_URL = os.environ.get("CF_API_URL")
-CF_API_TOKEN = os.environ.get("CF_API_TOKEN")
-
-if not all([CF_API_URL, CF_API_TOKEN]):
-    sys.exit("Missing CF_API_URL or CF_API_TOKEN")
+from sheets_common import get_sheet, read_records, read_all_values, write_matrix
 
 
-def fetch_all(supabase, table, select, chunk=1000):
-    rows = []
-    start = 0
-    while True:
-        resp = supabase.table(table).select(select).range(start, start + chunk - 1).execute()
-        rows += resp.data
-        if len(resp.data) < chunk:
-            break
-        start += chunk
-    return rows
-
-
-def purge_old_audit_scans(supabase, days=3):
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+def parse_ts(val):
+    if not val:
+        return None
     try:
-        supabase.table("audit_scans").delete().lt("scanned_at", cutoff).execute()
-        print(f"Purged audit_scans rows older than {cutoff}.")
-    except Exception as e:
-        print(f"  failed to purge old audit_scans rows: {e}")
+        return datetime.fromisoformat(str(val).replace("Z", "+00:00"))
+    except ValueError:
+        pass
+    try:
+        return datetime.strptime(str(val).strip(), "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return None
 
+
+def purge_old_audit_scans(sh, days=3):
+    rows = read_all_values(sh, "AUDIT_SCANS")
+    if len(rows) < 2:
+        print("AUDIT_SCANS is empty -- nothing to purge.")
+        return
+    headers = rows[0]
+    if "scanned_at" not in headers:
+        print("AUDIT_SCANS has no scanned_at column -- skipping purge.")
+        return
+    ti = headers.index("scanned_at")
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+
+    kept = [headers]
+    dropped = 0
+    for row in rows[1:]:
+        ts = parse_ts(row[ti] if len(row) > ti else "")
+        if ts is not None and ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        if ts is not None and ts < cutoff:
+            dropped += 1
+            continue
+        kept.append(row)
+
+    if dropped:
+        write_matrix(sh, "AUDIT_SCANS", kept, clear_first=True, min_rows=max(100, len(kept)), min_cols=len(headers))
+    print(f"Purged {dropped} AUDIT_SCANS rows older than {cutoff.isoformat()}.")
 
 
 def main():
-    supabase = CFStore()
+    sh = get_sheet()
 
-    findings = fetch_all(supabase, "active_findings", "awb_number, pendency_type")
+    findings = read_records(sh, "ACTIVE_FINDINGS")
     if not findings:
         print("No active findings -- nothing to check.")
-        purge_old_audit_scans(supabase)
+        purge_old_audit_scans(sh)
         return
 
-    awbs = [f["awb_number"] for f in findings]
+    audit_master = read_records(sh, "AUDIT_MASTER")
     current_stage = {}
-    CHUNK = 200
-    for i in range(0, len(awbs), CHUNK):
-        chunk = awbs[i:i + CHUNK]
-        resp = supabase.table("audit_master").select("awb_number, pendency_type").in_("awb_number", chunk).execute()
-        for row in resp.data:
-            current_stage[row["awb_number"]] = row.get("pendency_type")
+    for row in audit_master:
+        awb = str(row.get("awb_number") or "").strip().upper()
+        if awb:
+            current_stage[awb] = row.get("pendency_type")
 
-    to_close = []
+    to_close = set()
     for f in findings:
-        awb = f["awb_number"]
+        awb = str(f.get("awb_number") or "").strip().upper()
         alerted_stage = f.get("pendency_type")
-        now_stage = current_stage.get(awb)  # None if the AWB isn't in audit_master at all right now
+        now_stage = current_stage.get(awb)  # None if the AWB isn't in AUDIT_MASTER at all right now
 
         if alerted_stage == "At Dock":
             if now_stage is None:
-                to_close.append(awb)  # cleared from pendency after being at dock -- normal completion
+                to_close.add(awb)  # cleared from pendency after being at dock -- normal completion
             # still shows At Dock -> stays open
         else:
             if now_stage == "At Dock":
-                to_close.append(awb)  # progressed to At Dock -- closed
+                to_close.add(awb)  # progressed to At Dock -- closed
             # still not at dock (whether still present or gone) -> stays open
 
     if to_close:
-        for i in range(0, len(to_close), CHUNK):
-            supabase.table("active_findings").delete().in_("awb_number", to_close[i:i + CHUNK]).execute()
+        headers = list(findings[0].keys())
+        remaining = [f for f in findings if str(f.get("awb_number") or "").strip().upper() not in to_close]
+        matrix = [headers] + [[f.get(h, "") for h in headers] for f in remaining]
+        write_matrix(sh, "ACTIVE_FINDINGS", matrix, clear_first=True, min_rows=max(100, len(matrix)), min_cols=len(headers))
 
     print(f"Checked {len(findings)} findings, closed {len(to_close)}, {len(findings) - len(to_close)} remain open.")
 
-    purge_old_audit_scans(supabase)
+    purge_old_audit_scans(sh)
 
 
 if __name__ == "__main__":
