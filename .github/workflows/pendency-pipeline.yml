@@ -7,6 +7,7 @@ jobs:
   run-pipeline:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v5
@@ -19,6 +20,11 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}'
+
       - name: Install Playwright browser
         run: playwright install --with-deps chromium
 
@@ -26,7 +32,6 @@ jobs:
         env:
           SHADOWFAX_USERNAME: ${{ secrets.SHADOWFAX_USERNAME }}
           SHADOWFAX_PASSWORD: ${{ secrets.SHADOWFAX_PASSWORD }}
-          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           AUDIT_SHEET_ID: ${{ secrets.AUDIT_SHEET_ID }}
         run: python download_pendency.py
 
@@ -39,10 +44,11 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-      - name: Build AUDIT_MASTER in Google Sheets
+      - name: Build audit master table
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           AUDIT_SHEET_ID: ${{ secrets.AUDIT_SHEET_ID }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           NTFY_TOPIC_REV: ${{ secrets.NTFY_TOPIC_REV }}
+          NTFY_TOPIC_SKIP: ${{ secrets.NTFY_TOPIC_SKIP }}
         run: python build_audit_master.py
