@@ -51,10 +51,7 @@ jobs:
 
       - name: Build audit master table
         env:
-          CF_API_URL: ${{ secrets.CF_API_URL }}
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           AUDIT_SHEET_ID: ${{ secrets.AUDIT_SHEET_ID }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           NTFY_TOPIC_REV: ${{ secrets.NTFY_TOPIC_REV }}
-          NTFY_TOPIC_SKIP: ${{ secrets.NTFY_TOPIC_SKIP }}
         run: python build_audit_master.py
