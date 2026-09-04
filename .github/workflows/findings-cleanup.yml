@@ -1,6 +1,9 @@
 name: Findings Cleanup
 on:
   workflow_dispatch:  # triggered externally (cron-job.org) at 09:00 and 21:00 IST
+permissions:
+  contents: read
+  id-token: write
 jobs:
   cleanup-findings:
     runs-on: ubuntu-latest
@@ -14,8 +17,12 @@ jobs:
           python-version: '3.11'
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: pendency-github@flawless-energy-507612-e0.iam.gserviceaccount.com
       - name: Run findings cleanup
         env:
-          CF_API_URL: ${{ secrets.CF_API_URL }}
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          AUDIT_SHEET_ID: ${{ secrets.AUDIT_SHEET_ID }}
         run: python findings_cleanup.py
