@@ -1,6 +1,9 @@
 name: Scan Rate Alerts
 on:
   workflow_dispatch:  # triggered externally (cron-job.org) at :15 and :45 past the hour
+permissions:
+  contents: read
+  id-token: write
 jobs:
   send-scan-rate-alerts:
     runs-on: ubuntu-latest
@@ -14,9 +17,13 @@ jobs:
           python-version: '3.11'
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: pendency-github@flawless-energy-507612-e0.iam.gserviceaccount.com
       - name: Send scan rate alerts
         env:
-          CF_API_URL: ${{ secrets.CF_API_URL }}
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          AUDIT_SHEET_ID: ${{ secrets.AUDIT_SHEET_ID }}
           NTFY_TOPIC_SCAN_RATE: ${{ secrets.NTFY_TOPIC_SCAN_RATE }}
         run: python scan_rate_alert.py
