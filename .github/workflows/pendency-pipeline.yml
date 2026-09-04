@@ -27,7 +27,7 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: pendency-github@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com
+          service_account: pendency-github@flawless-energy-507612-e0.iam.gserviceaccount.com
 
       - name: Install Playwright browser
         run: playwright install --with-deps chromium
