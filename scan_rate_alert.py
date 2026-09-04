@@ -6,7 +6,9 @@ of awb_number).
 
 Runs on its own schedule (see .github/workflows/scan-rate-alert.yml),
 offset 15 minutes past each natural slot boundary so the underlying
-primary_scan_events / secondary_scan_events data has time to fully settle before being read:
+PRIMARY_SCAN_EVENTS / SECONDARY_SCAN_EVENTS tabs (written by
+build_audit_master.py, in the same PENDENCY MASTER Google Sheet) have
+time to fully settle before being read:
 
   :45 past the hour  -> HALF-HOUR slot, this hour's first half
                         (e.g. the 10:45 run pushes the 10:00-10:30 slot)
@@ -15,6 +17,8 @@ primary_scan_events / secondary_scan_events data has time to fully settle before
 
 A Block/scan-type combination with zero events in the window sends no
 image at all -- four empty images every 30 minutes would just be noise.
+
+No Cloudflare anywhere -- events are read straight out of the Sheet.
 """
 
 import os
@@ -24,18 +28,20 @@ from io import BytesIO
 
 import requests
 from PIL import Image, ImageDraw, ImageFont
-from cf_store import CFStore
 
-CF_API_URL = os.environ.get("CF_API_URL")
-CF_API_TOKEN = os.environ.get("CF_API_TOKEN")
-NTFY_TOPIC_SCAN_RATE = os.environ.get("NTFY_TOPIC_SCAN_RATE")  # dedicated channel for scan-rate images (separate from "Shipment updated" alerts)
+from sheets_common import get_sheet, read_records
 
-if not all([CF_API_URL, CF_API_TOKEN, NTFY_TOPIC_SCAN_RATE]):
-    sys.exit("Missing CF_API_URL, CF_API_TOKEN, or NTFY_TOPIC_SCAN_RATE")
+NTFY_TOPIC_SCAN_RATE = os.environ.get("NTFY_TOPIC_SCAN_RATE")
+
+if not NTFY_TOPIC_SCAN_RATE:
+    sys.exit("Missing NTFY_TOPIC_SCAN_RATE")
 
 IST = timezone(timedelta(hours=5, minutes=30))
 BLOCKS = ["Block A", "Block D"]
-SCAN_TYPES = [("primary", "PRIMARY"), ("secondary", "SECONDARY")]
+SCAN_TYPES = [
+    ("primary", "PRIMARY", "PRIMARY_SCAN_EVENTS"),
+    ("secondary", "SECONDARY", "SECONDARY_SCAN_EVENTS"),
+]
 
 FONT_REGULAR = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 FONT_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
@@ -74,26 +80,17 @@ def determine_window():
     return window_start, window_end, slot_label, is_full_hour
 
 
-def fetch_events(supabase, scan_type, block, window_start, window_end):
-    table = "primary_scan_events" if scan_type == "primary" else "secondary_scan_events"
-    rows = []
-    start = 0
-    PAGE = 1000
-    while True:
-        resp = (
-            supabase.table(table)
-            .select("awb_number, layout_name, action_user, emp_name")
-            .eq("blocks", block)
-            .gte("occurred_at", window_start.strftime("%Y-%m-%d %H:%M:%S"))
-            .lt("occurred_at", window_end.strftime("%Y-%m-%d %H:%M:%S"))
-            .range(start, start + PAGE - 1)
-            .execute()
-        )
-        rows += resp.data
-        if len(resp.data) < PAGE:
-            break
-        start += PAGE
-    return rows
+def fetch_events(sh, tab_name, block, window_start, window_end):
+    # occurred_at is stored as "YYYY-MM-DD HH:MM:SS" (see build_audit_master.py
+    # normalize_timestamp), so a plain string comparison sorts correctly --
+    # same trick the old Cloudflare filter relied on.
+    start_s = window_start.strftime("%Y-%m-%d %H:%M:%S")
+    end_s = window_end.strftime("%Y-%m-%d %H:%M:%S")
+    rows = read_records(sh, tab_name)
+    return [
+        r for r in rows
+        if r.get("blocks") == block and start_s <= str(r.get("occurred_at") or "") < end_s
+    ]
 
 
 def group_rows(rows):
@@ -160,8 +157,6 @@ def render_image(block, scan_type, scan_type_label, slot_label, layout_order, gr
         for user, count in grouped[layout].items():
             draw.rectangle([pad, y, width - pad, y + row_h], outline="#eeeeee")
             if first_row:
-                # Layout name shares this row with the first user under it
-                # -- no separate blank header row anymore.
                 draw.text((pad + 8, y + 6), layout, font=font_bold, fill="#000000")
                 first_row = False
             draw.text((pad + col1_w + 8, y + 6), str(user), font=font, fill="#000000")
@@ -171,8 +166,6 @@ def render_image(block, scan_type, scan_type_label, slot_label, layout_order, gr
             draw.text((pad + col1_w + col2_w + (col3_w - ctw) / 2, y + 6), ctext, font=font, fill="#c00000")
             y += row_h
 
-    # Grand Total: green if it meets the block's scan-rate target for this
-    # scan type + period, red if it's below target.
     threshold = SCAN_RATE_THRESHOLDS[scan_type]["full" if is_full_hour else "half"]
     total_color = "#1e7e34" if grand_total >= threshold else "#c00000"
     draw.rectangle([pad, y, width - pad, y + row_h], fill="#dbe5f1", outline="#999999")
@@ -204,14 +197,14 @@ def send_image(topic, title, filename, png_bytes):
 
 
 def main():
-    supabase = CFStore()
+    sh = get_sheet()
     window_start, window_end, slot_label, is_full_hour = determine_window()
     kind = "full-hour" if is_full_hour else "half-hour"
     print(f"Slot: {slot_label} ({kind}), querying {window_start.isoformat()} to {window_end.isoformat()}")
 
-    for scan_type, scan_type_label in SCAN_TYPES:
+    for scan_type, scan_type_label, tab_name in SCAN_TYPES:
         for block in BLOCKS:
-            rows = fetch_events(supabase, scan_type, block, window_start, window_end)
+            rows = fetch_events(sh, tab_name, block, window_start, window_end)
             if not rows:
                 print(f"  {block} / {scan_type}: no events -- skipping image.")
                 continue
