@@ -819,25 +819,33 @@ def log_primary_secondary_events(sh, records):
         min_cols=2,
     )
 
-    purge_scan_events_before_current_hour(sh)
+    purge_scan_events_before_retention_window(sh)
 
     print(f"Scan events: {len(primary_events)} new primary, {len(secondary_events)} new secondary.")
 
 
-def purge_scan_events_before_current_hour(sh):
-    """Keep PRIMARY_SCAN_EVENTS / SECONDARY_SCAN_EVENTS down to ONLY the
-    current hour's rows. This runs every 15 minutes (this pipeline's
-    cadence), so within ~15 minutes of a new hour starting, everything
-    from the previous hour is gone -- e.g. once the clock reaches 21:00,
-    everything before 21:00 is deleted, so TV's 21:00-21:30 half-hour
-    window never has anything from before 21:00 mixed in.
+def purge_scan_events_before_retention_window(sh):
+    """Keep PRIMARY_SCAN_EVENTS / SECONDARY_SCAN_EVENTS down to the current
+    hour PLUS the immediately preceding hour (2 hours), not just the
+    current hour alone.
+
+    This runs every 15 minutes (this pipeline's cadence). A pure
+    "current hour only" retention was tried first and broke two things
+    that both need the just-completed hour's data to still exist during
+    the FIRST 30 minutes of the next hour: TV's "Full-Hour" catch-up
+    screen (shown when clock-minute < 30, displaying the previous
+    complete hour's totals) and scan_rate_alert.py's matching full-hour
+    ntfy image (sent at :15 covering the previous hour) -- both went
+    blank because the data they needed had already been deleted the
+    moment the new hour began. Retaining 2 hours keeps both working while
+    still bounding the table to a tiny, non-growing size.
 
     occurred_at is plain IST wall-clock text ("YYYY-MM-DD HH:MM:SS"), so
-    comparing it as a string against the current hour's start works
-    correctly (fixed-width zero-padded text sorts the same as chronological
-    order).
+    comparing it as a string against the cutoff works correctly
+    (fixed-width zero-padded text sorts the same as chronological order).
     """
-    hour_start = datetime.now(timezone.utc).astimezone(IST).strftime("%Y-%m-%d %H:00:00")
+    this_hour_start = datetime.now(timezone.utc).astimezone(IST).replace(minute=0, second=0, microsecond=0)
+    cutoff = (this_hour_start - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
     for title in ("PRIMARY_SCAN_EVENTS", "SECONDARY_SCAN_EVENTS"):
         rows = read_all_values(sh, title)
         if len(rows) < 2:
@@ -846,10 +854,10 @@ def purge_scan_events_before_current_hour(sh):
         if "occurred_at" not in headers:
             continue
         ti = headers.index("occurred_at")
-        kept = [headers] + [row for row in rows[1:] if len(row) > ti and row[ti] >= hour_start]
+        kept = [headers] + [row for row in rows[1:] if len(row) > ti and row[ti] >= cutoff]
         if len(kept) < len(rows):
             write_matrix(sh, title, kept, clear_first=True, min_rows=max(100, len(kept)), min_cols=len(headers))
-            print(f"  {title}: purged {len(rows) - len(kept)} rows before {hour_start}")
+            print(f"  {title}: purged {len(rows) - len(kept)} rows older than {cutoff}")
 
 
 def sync_load_pending_summary(sh, ref):
