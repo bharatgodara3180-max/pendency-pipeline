@@ -378,12 +378,21 @@ def write_full_table(sh, title, records, min_cols=30):
     payload limits. This is Google Sheets only.
     """
     matrix = records_to_matrix(records)
-    rows_needed = max(len(matrix), 100)
-    cols_needed = max(len(matrix[0]), min_cols)
-    ws = get_or_create_worksheet(sh, title, rows=max(rows_needed, 1000), cols=max(cols_needed, 30))
+    rows_needed = max(len(matrix), 1)
+    cols_needed = max(len(matrix[0]) if matrix and matrix[0] else 0, min_cols)
+    ws = get_or_create_worksheet(sh, title, rows=rows_needed, cols=cols_needed)
 
-    if ws.row_count < rows_needed or ws.col_count < cols_needed:
-        ws.resize(rows=max(ws.row_count, rows_needed), cols=max(ws.col_count, cols_needed))
+    # Resize to the EXACT size needed every run -- shrinking as well as
+    # growing. Google Sheets counts a workbook's total cell ALLOCATION
+    # (row x col per sheet, whether populated or not) against a fixed
+    # 10,000,000-cell-per-workbook ceiling, not just cells that hold data.
+    # The old version only ever grew a sheet, never shrank it, so every
+    # table's grid permanently kept its all-time peak size -- a one-way
+    # ratchet that eventually ate the whole workbook's budget and started
+    # failing ALL writes with "would increase the number of cells in the
+    # workbook above the limit of 10000000 cells", not just this one.
+    if ws.row_count != rows_needed or ws.col_count != cols_needed:
+        ws.resize(rows=rows_needed, cols=cols_needed)
 
     print(f"Clearing {title}...")
     ws.clear()
@@ -393,8 +402,6 @@ def write_full_table(sh, title, records, min_cols=30):
     for start in range(0, total, WRITE_CHUNK):
         chunk = matrix[start:start + WRITE_CHUNK]
         end = start + len(chunk)
-        cell_range = f"A{start + 1}:{gspread.utils.rowcol_to_a1(end, len(matrix[0])).replace(str(end), '')}{end}"
-        # rowcol_to_a1 gives e.g. Z500; build the column letter separately.
         last_col = gspread.utils.rowcol_to_a1(1, len(matrix[0])).rstrip("1")
         cell_range = f"A{start + 1}:{last_col}{end}"
         ws.update(range_name=cell_range, values=chunk, raw=True)
@@ -406,14 +413,12 @@ def write_full_table(sh, title, records, min_cols=30):
 def write_matrix(sh, title, matrix, clear_first=False, min_rows=100, min_cols=10):
     if not matrix:
         return
-    ws = get_or_create_worksheet(
-        sh,
-        title,
-        rows=max(len(matrix), min_rows),
-        cols=max(len(matrix[0]), min_cols),
-    )
-    if ws.row_count < len(matrix) or ws.col_count < len(matrix[0]):
-        ws.resize(rows=max(ws.row_count, len(matrix)), cols=max(ws.col_count, len(matrix[0])))
+    rows_needed = max(len(matrix), 1)
+    cols_needed = max(len(matrix[0]) if matrix[0] else 0, min_cols)
+    ws = get_or_create_worksheet(sh, title, rows=rows_needed, cols=cols_needed)
+    # Same shrink-to-fit fix as write_full_table() above.
+    if ws.row_count != rows_needed or ws.col_count != cols_needed:
+        ws.resize(rows=rows_needed, cols=cols_needed)
     if clear_first:
         ws.clear()
     for start in range(0, len(matrix), WRITE_CHUNK):
