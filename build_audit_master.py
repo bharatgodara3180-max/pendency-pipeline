@@ -966,11 +966,13 @@ def main():
     print("Checking shipment update alerts...")
     check_for_updates_and_alert(sh, records)
 
+    # Load Pending summary (SDD/AIR/NDD LOAD -> LOAD_PENDING_SUMMARY) is
+    # intentionally NOT synced here anymore -- handling this via your own
+    # Sheets formulas directly off SDD LOAD / AIR LOAD / NDD LOAD, per your
+    # request. sync_load_pending_summary() is left defined below in case
+    # you want it back later.
     print("Logging Primary/Secondary scan events...")
     log_primary_secondary_events(sh, records)
-
-    print("Syncing Load Pending summary...")
-    sync_load_pending_summary(sh, ref)
 
     print("Syncing Pendency snapshot summary...")
     sync_pendency_snapshot_summary(sh, records, captured_at)
