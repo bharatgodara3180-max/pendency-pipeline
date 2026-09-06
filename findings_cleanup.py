@@ -83,6 +83,39 @@ def purge_old_audit_scans(sh, days=3):
     print(f"Purged {dropped} AUDIT_SCANS rows older than {cutoff.isoformat()}.")
 
 
+def purge_old_timestamped_rows(sh, tab_name, ts_column, days):
+    """Generic version of purge_old_audit_scans() -- keeps a log-style tab
+    from growing forever without ever affecting what a report over a
+    recent window sees (scan_rate_alert.py only ever looks at the last
+    hour). Unbounded growth here was slowing down every full-table read of
+    this tab, in Apps Script and everywhere else."""
+    rows = read_all_values(sh, tab_name)
+    if len(rows) < 2:
+        print(f"{tab_name} is empty -- nothing to purge.")
+        return
+    headers = rows[0]
+    if ts_column not in headers:
+        print(f"{tab_name} has no {ts_column} column -- skipping purge.")
+        return
+    ti = headers.index(ts_column)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+
+    kept = [headers]
+    dropped = 0
+    for row in rows[1:]:
+        ts = parse_ts(row[ti] if len(row) > ti else "")
+        if ts is not None and ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        if ts is not None and ts < cutoff:
+            dropped += 1
+            continue
+        kept.append(row)
+
+    if dropped:
+        write_matrix(sh, tab_name, kept, clear_first=True, min_rows=max(100, len(kept)), min_cols=len(headers))
+    print(f"Purged {dropped} {tab_name} rows older than {cutoff.isoformat()}.")
+
+
 def main():
     sh = get_sheet()
 
@@ -90,6 +123,8 @@ def main():
     if not findings:
         print("No active findings -- nothing to check.")
         purge_old_audit_scans(sh)
+        purge_old_timestamped_rows(sh, "PRIMARY_SCAN_EVENTS", "occurred_at", days=2)
+        purge_old_timestamped_rows(sh, "SECONDARY_SCAN_EVENTS", "occurred_at", days=2)
         return
 
     audit_master = read_records(sh, "AUDIT_MASTER")
@@ -123,6 +158,8 @@ def main():
     print(f"Checked {len(findings)} findings, closed {len(to_close)}, {len(findings) - len(to_close)} remain open.")
 
     purge_old_audit_scans(sh)
+    purge_old_timestamped_rows(sh, "PRIMARY_SCAN_EVENTS", "occurred_at", days=2)
+    purge_old_timestamped_rows(sh, "SECONDARY_SCAN_EVENTS", "occurred_at", days=2)
 
 
 if __name__ == "__main__":
