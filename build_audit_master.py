@@ -39,8 +39,9 @@ STATE_READ_CHUNK = 500
 
 RDCPFC_CATEGORIES = {"NOT IN BAG / Received at DC", "CLIENT Warehouse"}
 AT_DOCKBRSNR_CATEGORIES = {"IN BAG / At Dock", "IN BAG / BRSNR"}
-FWD_PFC_TYPES = {"CLIENT Warehouse", "BRSNR"}
 LOAD_PENDING_SHEETS = ["SDD LOAD", "AIR LOAD", "NDD LOAD"]
+
+IST = timezone(timedelta(hours=5, minutes=30))
 
 if not AUDIT_SHEET_ID:
     sys.exit("Missing AUDIT_SHEET_ID")
@@ -718,6 +719,16 @@ def _is_new_scan(new_time, prev_time):
 
 
 def log_primary_secondary_events(sh, records):
+    """Primary / Secondary scan-rate events -- exactly two categories,
+    decided by a single rule: among FWD shipments whose pendency_type is
+    "Received at DC", bin_level "1" = Primary, bin_level "2" = Secondary.
+    (This used to also track a third "PFC" category via PFC_FIRST_SEEN --
+    removed, per your decision to keep exactly two.)
+
+    Also purges PRIMARY_SCAN_EVENTS / SECONDARY_SCAN_EVENTS down to ONLY
+    the current hour's rows every run -- see
+    purge_scan_events_before_current_hour() below.
+    """
     existing_primary = read_current_stage_state(sh, "RDC_LAST_SEEN", "rdc_time")
     existing_secondary = read_current_stage_state(sh, "AT_DOCK_LAST_SEEN", "at_dock_time")
 
@@ -726,6 +737,8 @@ def log_primary_secondary_events(sh, records):
 
     for r in records:
         if r.get("report_type") != "FWD":
+            continue
+        if (r.get("pendency_type") or "").strip() != "Received at DC":
             continue
         awb = str(r.get("awb_number") or "").strip().upper()
         if not awb:
@@ -774,18 +787,6 @@ def log_primary_secondary_events(sh, records):
             })
         secondary_state.append({"awb_number": awb, "at_dock_time": ts})
 
-    pfc_rows = []
-    existing_pfc = read_state_rows(sh, "PFC_FIRST_SEEN")
-    for r in records:
-        if r.get("report_type") == "FWD" and (r.get("pendency_type") or "").strip() in FWD_PFC_TYPES:
-            awb = str(r.get("awb_number") or "").strip().upper()
-            if awb and awb not in existing_pfc:
-                pfc_rows.append({
-                    "awb_number": awb,
-                    "first_seen_at": r.get("item_last_updated"),
-                    "pendency_type": r.get("pendency_type"),
-                })
-
     append_rows(
         sh,
         "PRIMARY_SCAN_EVENTS",
@@ -797,12 +798,6 @@ def log_primary_secondary_events(sh, records):
         "SECONDARY_SCAN_EVENTS",
         ["awb_number", "action_user", "emp_name", "client_name", "layout_name", "blocks", "occurred_at"],
         secondary_events,
-    )
-    append_rows(
-        sh,
-        "PFC_FIRST_SEEN",
-        ["awb_number", "first_seen_at", "pendency_type"],
-        pfc_rows,
     )
 
     # Current-stage sheets are fully replaced each run, which is correct because
@@ -824,7 +819,37 @@ def log_primary_secondary_events(sh, records):
         min_cols=2,
     )
 
-    print(f"Scan events: {len(primary_events)} new primary, {len(secondary_events)} new secondary, {len(pfc_rows)} new PFC first-seen.")
+    purge_scan_events_before_current_hour(sh)
+
+    print(f"Scan events: {len(primary_events)} new primary, {len(secondary_events)} new secondary.")
+
+
+def purge_scan_events_before_current_hour(sh):
+    """Keep PRIMARY_SCAN_EVENTS / SECONDARY_SCAN_EVENTS down to ONLY the
+    current hour's rows. This runs every 15 minutes (this pipeline's
+    cadence), so within ~15 minutes of a new hour starting, everything
+    from the previous hour is gone -- e.g. once the clock reaches 21:00,
+    everything before 21:00 is deleted, so TV's 21:00-21:30 half-hour
+    window never has anything from before 21:00 mixed in.
+
+    occurred_at is plain IST wall-clock text ("YYYY-MM-DD HH:MM:SS"), so
+    comparing it as a string against the current hour's start works
+    correctly (fixed-width zero-padded text sorts the same as chronological
+    order).
+    """
+    hour_start = datetime.now(timezone.utc).astimezone(IST).strftime("%Y-%m-%d %H:00:00")
+    for title in ("PRIMARY_SCAN_EVENTS", "SECONDARY_SCAN_EVENTS"):
+        rows = read_all_values(sh, title)
+        if len(rows) < 2:
+            continue
+        headers = rows[0]
+        if "occurred_at" not in headers:
+            continue
+        ti = headers.index("occurred_at")
+        kept = [headers] + [row for row in rows[1:] if len(row) > ti and row[ti] >= hour_start]
+        if len(kept) < len(rows):
+            write_matrix(sh, title, kept, clear_first=True, min_rows=max(100, len(kept)), min_cols=len(headers))
+            print(f"  {title}: purged {len(rows) - len(kept)} rows before {hour_start}")
 
 
 def sync_load_pending_summary(sh, ref):
