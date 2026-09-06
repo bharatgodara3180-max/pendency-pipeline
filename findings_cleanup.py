@@ -123,8 +123,6 @@ def main():
     if not findings:
         print("No active findings -- nothing to check.")
         purge_old_audit_scans(sh)
-        purge_old_timestamped_rows(sh, "PRIMARY_SCAN_EVENTS", "occurred_at", days=0.5)
-        purge_old_timestamped_rows(sh, "SECONDARY_SCAN_EVENTS", "occurred_at", days=0.5)
         return
 
     audit_master = read_records(sh, "AUDIT_MASTER")
@@ -158,8 +156,6 @@ def main():
     print(f"Checked {len(findings)} findings, closed {len(to_close)}, {len(findings) - len(to_close)} remain open.")
 
     purge_old_audit_scans(sh)
-    purge_old_timestamped_rows(sh, "PRIMARY_SCAN_EVENTS", "occurred_at", days=0.5)
-    purge_old_timestamped_rows(sh, "SECONDARY_SCAN_EVENTS", "occurred_at", days=0.5)
 
 
 if __name__ == "__main__":
