@@ -872,10 +872,27 @@ def sync_pendency_snapshot_summary(sh, records, captured_at, retain_days=31):
     were already silently empty/stale before the Cloudflare migration.
     Computed here directly from the same in-memory `records` AUDIT_MASTER
     is built from, instead of a separate script reading a separate CSV.
+
+    IMPORTANT: `records` only carries the STRIPPED `pendency_type`
+    ("At Dock", "BRSNR", "Received at DC", "CLIENT Warehouse") -- the
+    dashboard's category filter buttons use the RAW, PREFIXED labels
+    ("IN BAG / At Dock", "IN BAG / BRSNR", "NOT IN BAG / Received at DC",
+    "CLIENT Warehouse"). Writing the stripped value as `category` here
+    meant only "CLIENT Warehouse" (which has no prefix) ever matched the
+    filter, silently hiding every other category. This map puts the
+    prefix back before writing.
     """
+    category_display = {
+        "Received at DC": "NOT IN BAG / Received at DC",
+        "At Dock": "IN BAG / At Dock",
+        "BRSNR": "IN BAG / BRSNR",
+        "CLIENT Warehouse": "CLIENT Warehouse",
+    }
+
     counts = {}
     for r in records:
-        key = (r.get("report_type") or "UNKNOWN", r.get("pendency_type") or "UNKNOWN", r.get("aging_bucket") or "UNKNOWN")
+        raw_category = category_display.get(r.get("pendency_type"), r.get("pendency_type") or "UNKNOWN")
+        key = (r.get("report_type") or "UNKNOWN", raw_category, r.get("aging_bucket") or "UNKNOWN")
         counts[key] = counts.get(key, 0) + 1
 
     new_rows = [
@@ -889,7 +906,12 @@ def sync_pendency_snapshot_summary(sh, records, captured_at, retain_days=31):
         headers = existing[0]
         for row in existing[1:]:
             padded = row + [""] * (len(headers) - len(row))
-            history.append(dict(zip(headers, padded)))
+            record = dict(zip(headers, padded))
+            # Self-heal any history rows written by the earlier (buggy)
+            # version of this function, instead of waiting retain_days for
+            # them to age out.
+            record["category"] = category_display.get(record.get("category"), record.get("category"))
+            history.append(record)
 
     history.extend(new_rows)
 
