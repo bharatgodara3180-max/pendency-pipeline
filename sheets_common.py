@@ -101,13 +101,17 @@ def _last_col_letter(n_cols):
 def write_matrix(sh, title, matrix, clear_first=False, min_rows=100, min_cols=10):
     if not matrix or not matrix[0]:
         return None
-    ws = get_or_create_worksheet(
-        sh, title,
-        rows=max(len(matrix), min_rows),
-        cols=max(len(matrix[0]), min_cols),
-    )
-    if ws.row_count < len(matrix) or ws.col_count < len(matrix[0]):
-        ws.resize(rows=max(ws.row_count, len(matrix)), cols=max(ws.col_count, len(matrix[0])))
+    rows_needed = max(len(matrix), 1)
+    cols_needed = max(len(matrix[0]), min_cols)
+    ws = get_or_create_worksheet(sh, title, rows=rows_needed, cols=cols_needed)
+    # Resize to the EXACT size needed, shrinking as well as growing -- see
+    # the matching fix (and full explanation) in build_audit_master.py's
+    # write_matrix/write_full_table. Without this, purging old rows out of
+    # a log tab (findings_cleanup.py's whole job) never actually reclaims
+    # any of the workbook's fixed 10,000,000-cell budget, since the grid
+    # itself stays at its all-time peak size.
+    if ws.row_count != rows_needed or ws.col_count != cols_needed:
+        ws.resize(rows=rows_needed, cols=cols_needed)
     if clear_first:
         ws.clear()
     last_col = _last_col_letter(len(matrix[0]))
@@ -122,11 +126,11 @@ def write_full_table(sh, title, records, headers=None, min_cols=30):
     """Replace a worksheet's data in one logical operation, chunked so a
     100k-row table stays within request payload limits."""
     matrix = records_to_matrix(records, headers=headers)
-    rows_needed = max(len(matrix), 100)
-    cols_needed = max(len(matrix[0]) if matrix[0] else 1, min_cols)
-    ws = get_or_create_worksheet(sh, title, rows=max(rows_needed, 1000), cols=max(cols_needed, 30))
-    if ws.row_count < rows_needed or ws.col_count < cols_needed:
-        ws.resize(rows=max(ws.row_count, rows_needed), cols=max(ws.col_count, cols_needed))
+    rows_needed = max(len(matrix), 1)
+    cols_needed = max(len(matrix[0]) if matrix[0] else 0, min_cols)
+    ws = get_or_create_worksheet(sh, title, rows=rows_needed, cols=cols_needed)
+    if ws.row_count != rows_needed or ws.col_count != cols_needed:
+        ws.resize(rows=rows_needed, cols=cols_needed)
     print(f"Clearing {title}...")
     ws.clear()
     last_col = _last_col_letter(len(matrix[0]) if matrix[0] else 1)
