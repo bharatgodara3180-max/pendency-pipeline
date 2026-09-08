@@ -623,13 +623,17 @@ def append_rows(sh, title, headers, new_rows):
 
 
 def check_for_updates_and_alert(sh, records):
-    if not NTFY_TOPIC and not NTFY_TOPIC_REV:
+    if not NTFY_TOPIC:
         print("No NTFY topic configured -- skipping update alerts.")
         return
 
-    tracked = [r for r in records if is_tracked(r.get("aging_bucket")) and r.get("awb_number")]
+    # FWD only, per your instruction -- REV shipments are excluded here.
+    tracked = [
+        r for r in records
+        if r.get("report_type") == "FWD" and is_tracked(r.get("aging_bucket")) and r.get("awb_number")
+    ]
     if not tracked:
-        print("No 1_day+ shipments -- no update checks.")
+        print("No 1_day+ FWD shipments -- no update checks.")
         return
 
     unique = {}
@@ -989,24 +993,19 @@ def main():
     print("Enriching REV rows...")
     records.extend(enrich_dataframe(rev_df, lookups, "REV"))
 
-    # Everything below except log_primary_secondary_events() is
-    # intentionally DISABLED, per your decision to keep only what the TV
-    # (half-hourly/full-hourly Scan Rate + Pending Load) needs and drop
-    # everything the removed Floor Audit / dashboard screens used to need:
-    #   - AUDIT_MASTER is no longer written at all (it was the single
-    #     biggest contributor to hitting the 10,000,000-cell workbook
-    #     limit, and nothing left in the app reads it)
-    #   - check_for_updates_and_alert() (ALERT_STATE, AWB_UPDATE_ALERTS)
-    #     was the dashboard's shipment-update alert -- disabled
-    #   - sync_pendency_snapshot_summary() (PENDENCY_SNAPSHOT_SUMMARY) fed
-    #     the removed Live Pendency screen -- disabled
-    # `records` is still built above (FWD/REV enrichment) purely because
-    # log_primary_secondary_events() needs it to derive Primary/Secondary
-    # scan events -- it is never written to a sheet as AUDIT_MASTER.
+    # AUDIT_MASTER is still NOT written (it was the single biggest
+    # contributor to hitting the 10,000,000-cell workbook limit, and
+    # nothing left in the app reads it) and
+    # sync_pendency_snapshot_summary() (the removed Live Pendency screen)
+    # stays disabled. `records` is still built above (FWD/REV enrichment)
+    # purely in-memory -- it's never written to a sheet as AUDIT_MASTER.
     print("Logging Primary/Secondary scan events...")
     log_primary_secondary_events(sh, records)
 
-    print("DONE — TV-only mode (Scan Rate + Pending Load); dashboard-only data is no longer written")
+    print("Checking FWD ageing-shipment update alerts...")
+    check_for_updates_and_alert(sh, records)
+
+    print("DONE — TV (Scan Rate + Pending Load) + FWD ageing-shipment alerts")
 
 
 if __name__ == "__main__":
